@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from environments.util import Card, Suit
+from environments.util import Card, OutOfTurnException, Suit
 
 
 class TrickTakingGame:
@@ -15,11 +15,11 @@ class TrickTakingGame:
 
     All players interact with the same interface.
     An action is defined by (id, i) where id is the player's index and i is the index of the card they intend to play.
-      - if id != next player to move, no transition happens and zero reward is returned
-      - if card i is not held by player id, then a random card is played and a large negative reward is added
-      - otherwise, player id plays card i
-        - if the trick finishes, the score changes and the next player is set
-        - if the trick is ongoing, card i is marked as being played and the turn moves to the next player
+        - if id != next player to move, no transition happens and zero reward is returned
+        - if card i is not held by player id, then a random card is played and a large negative reward is added
+        - otherwise, player id plays card i
+            - if the trick finishes, the score changes and the next player is set
+            - if the trick is ongoing, card i is marked as being played and the turn moves to the next player
 
     Each reset() and step(action) returns a tuple of observations specific to each player, which comprises of only
     the information visible to that player. The reward is similarly a tuple of integers for each player.
@@ -41,7 +41,7 @@ class TrickTakingGame:
             [index of player holding card i or -1 if discarded| 0 <= i < self.num_cards] +
             [index of card in play or -1 if no card yet played by player j | 0 <= j < self.num_players] +
             [score of player j | 0 <= j < self.num_players] +
-            [index of player to move next]
+            [trump suit number or -1, trick leading card index or -1, index of player to move next]
 
         :return: Tuple[List[int, ...], ...] of observations
         """
@@ -50,9 +50,9 @@ class TrickTakingGame:
             card_distribution +
             [-1 for _ in range(self.num_players)] +
             [0 for _ in range(self.num_players)] +
-            [self._get_first_player(card_distribution)]
+            [random.randint(0, 3), -1, self._get_first_player(card_distribution)]
         )
-        assert len(self._state) == self.num_cards + 2 * self.num_players + 1, "state was reset to the wrong size"
+        assert len(self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the wrong size"
         return self._get_observations()
 
     def step(self, action):
@@ -61,12 +61,59 @@ class TrickTakingGame:
 
         :param action: Tuple[int, int], (id, i) representing player id playing card i
         :return: Tuple of the following:
-          - observation, Tuple[List[int, ...], ...] of observations
-          - reward, Tuple[int, ...] of rewards
-          - done, bool that is True if the game has ended, otherwise False
-          - info, Dict of diagnostic information, currently empty
+            - observation, Tuple[List[int, ...], ...] of observations
+            - reward, Tuple[int, ...] of rewards
+            - done, bool that is True if the game has ended, otherwise False
+            - info, Dict of diagnostic information, currently empty
         """
-        raise NotImplementedError
+        assert len(action) == 2, "invalid action"
+        player, card_index = action
+        num_cards = self.num_cards
+        num_players = self.num_players
+
+        rewards = [0 for _ in range(num_players)]
+
+        # Check if it is this player's turn
+        if player != self.next_player:
+            return self._get_observations(), rewards, False, {"error": OutOfTurnException}
+
+        # Check if the card is a valid play
+        if self._state[card_index] != player:
+            valid_cards = [i for i in self._state[:num_cards] if self._state[i] == player]
+            card_index = random.choice(valid_cards)  # Choose random valid move to play
+            rewards[player] -= 100  # Huge penalty for picking an invalid card!
+
+        # Play the card
+        self._state[card_index] = -1
+        assert self._state[num_cards + player] == -1, "Trying to play in a trick already played in"
+        self._state[num_cards + player] = card_index
+
+        # Check if trick completed
+        played_cards = self._state[num_cards: num_cards + num_players]
+        if -1 not in played_cards:
+            # Handle rewards
+            trick_rewards, next_leader = self._end_trick(played_cards, self._state[-3:-1])
+            rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
+            for i in range(num_cards + num_players, num_cards + 2 * num_players):
+                self._state[i] += trick_rewards[i]  # update current scores
+
+            # Reset trick
+            for i in range(num_cards, num_cards + num_players):
+                self._state[i] = -1
+            self._state[-2] = -1
+            self._state[-1] = next_leader
+
+        # Check if game ended
+        if sum(self._state[:num_cards]) == -self.num_cards:
+            done = True
+            # apply score bonus
+            ranking = sorted(range(self.num_players), key=lambda i: self._state[num_cards + num_players + i])
+            for i in range(self.num_players):
+                rewards[ranking[i]] += 2 * i
+        else:
+            done = False
+
+        return self._get_observations(), rewards, done, {}
 
     def render(self, mode="world", view: int = -1):
         """
@@ -76,7 +123,10 @@ class TrickTakingGame:
         :param view: int, render whole state if -1, otherwise render observation of agent view
         :return: None
         """
-        raise NotImplementedError
+        if view == -1 or not 0 <= view < self.num_players:
+            print(self._state)
+        else:
+            print(self._get_observations()[view])
 
     def _deal(self) -> List[int, ...]:
         """
@@ -128,6 +178,36 @@ class TrickTakingGame:
         return observations
 
     # Rule-related methods
+
+    def _get_trick_winner(self) -> Tuple[int, Card]:
+        """
+        Determine the winning player and card of a completed trick
+        :return: Tuple[int, Card], the index of the winning player and their played Card
+        """
+        trump_suit = Suit(self._state[-3])
+        starting_card = self.index_to_card(self._state[-2])
+        played_cards = [self.index_to_card(self._state[self.num_cards + i]) for i in range(self.num_players)]
+
+        winning_index = -1
+        winning_card = starting_card
+        for player_index, card in enumerate(played_cards):
+            if (card.suit == winning_card.suit and card.value >= winning_card.value) or \
+                    (card.suit == trump_suit and winning_card.suit != trump_suit):
+                winning_index = player_index
+                winning_card = card
+
+        return winning_index, winning_card
+
+    def _end_trick(self) -> Tuple[List[int, ...], int]:
+        """
+        Determine the rewards of a completed trick, and choose the player to start the next trick.
+        Should probably be overwritten by a child class.
+        :return: Tuple, of a vector of rewards for the current trick and the index of the next player to start
+        """
+        winning_player, winning_card = self._get_trick_winner()
+        rewards = [0 for _ in range(self.num_players)]
+        rewards[winning_player] = 1
+        return rewards, winning_player
 
     # noinspection PyMethodMayBeStatic
     def _get_first_player(self, card_distribution: List[int, ...]) -> int:
