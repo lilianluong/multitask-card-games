@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 from environments.trick_taking_game import TrickTakingGame
 from environments.util import Card, Suit
