@@ -50,7 +50,7 @@ class TrickTakingGame:
             card_distribution +
             [-1 for _ in range(self.num_players)] +
             [0 for _ in range(self.num_players)] +
-            [random.randint(0, 3), -1, self._get_first_player(card_distribution)]
+            [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
         )
         assert len(self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the wrong size"
         return self._get_observations()
@@ -78,8 +78,8 @@ class TrickTakingGame:
             return self._get_observations(), rewards, False, {"error": OutOfTurnException}
 
         # Check if the card is a valid play
-        if self._state[card_index] != player:
-            valid_cards = [i for i in self._state[:num_cards] if self._state[i] == player]
+        if not self._is_valid_play(player, card_index):
+            valid_cards = [i for i in range(num_cards) if self._is_valid_play(player, i)]
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             rewards[player] -= 100  # Huge penalty for picking an invalid card!
 
@@ -87,6 +87,9 @@ class TrickTakingGame:
         self._state[card_index] = -1
         assert self._state[num_cards + player] == -1, "Trying to play in a trick already played in"
         self._state[num_cards + player] = card_index
+        if self._state[-2] == -1:
+            # Trick leader
+            self._state[-2] = card_index
 
         # Check if trick completed
         played_cards = self._state[num_cards: num_cards + num_players]
@@ -104,12 +107,11 @@ class TrickTakingGame:
             self._state[-1] = next_leader
 
         # Check if game ended
-        if sum(self._state[:num_cards]) == -self.num_cards:
+        if sum(self._state[:num_cards]) == -num_cards:
             done = True
-            # apply score bonus
-            ranking = sorted(range(self.num_players), key=lambda i: self._state[num_cards + num_players + i])
-            for i in range(self.num_players):
-                rewards[ranking[i]] += 2 * i
+            # apply score bonuses
+            bonus_rewards = self._end_game_bonuses()
+            rewards = [rewards[i] + bonus_rewards[i] for i in range(num_players)]
         else:
             done = False
 
@@ -179,6 +181,26 @@ class TrickTakingGame:
 
     # Rule-related methods
 
+    def _end_game_bonuses(self) -> List[int, ...]:
+        """
+        Computes additional reward assigned to each player at the end of a game.
+        May be overwritten by child classes.
+        :return: vector of bonus rewards for each player
+        """
+        rewards = [0 for _ in range(self.num_players)]
+        return rewards
+
+    def _end_trick(self) -> Tuple[List[int, ...], int]:
+        """
+        Determine the rewards of a completed trick, and choose the player to start the next trick.
+        Should probably be overwritten by a child class.
+        :return: Tuple, of a vector of rewards for the current trick and the index of the next player to start
+        """
+        winning_player, winning_card = self._get_trick_winner()
+        rewards = [0 for _ in range(self.num_players)]
+        rewards[winning_player] = 1
+        return rewards, winning_player
+
     def _get_trick_winner(self) -> Tuple[int, Card]:
         """
         Determine the winning player and card of a completed trick
@@ -198,16 +220,13 @@ class TrickTakingGame:
 
         return winning_index, winning_card
 
-    def _end_trick(self) -> Tuple[List[int, ...], int]:
+    # noinspection PyMethodMayBeStatic
+    def _get_trump_suit(self) -> int:
         """
-        Determine the rewards of a completed trick, and choose the player to start the next trick.
-        Should probably be overwritten by a child class.
-        :return: Tuple, of a vector of rewards for the current trick and the index of the next player to start
+        Determine the trump suit.
+        :return: int, -1 if there is no trump else the numerical index of the suit
         """
-        winning_player, winning_card = self._get_trick_winner()
-        rewards = [0 for _ in range(self.num_players)]
-        rewards[winning_player] = 1
-        return rewards, winning_player
+        return random.randint(0, 3)
 
     # noinspection PyMethodMayBeStatic
     def _get_first_player(self, card_distribution: List[int, ...]) -> int:
@@ -216,6 +235,26 @@ class TrickTakingGame:
         :return: int, index of the player who gets the first turn
         """
         return 0
+
+    def _is_valid_play(self, player_index, card_index) -> bool:
+        """
+        Determines if a proposed card play is valid
+        :param player_index: player making the move
+        :param card_index: proposed card to be played
+        :return: True if the card play is valid, else False
+        """
+        if self._state[card_index] != player_index:
+            return False
+
+        # Check if player is empty of the starting suit if different suit was played
+        played_card = self.index_to_card(card_index)
+        starting_card = self.index_to_card(self._state[-2])
+        if played_card.suit != starting_card.suit:
+            for i in range(self.num_cards):
+                if self._state[i] == player_index and self.index_to_card(i).suit == starting_card.suit:
+                    return False
+
+        return True
 
     @property
     def cards_per_suit(self) -> Tuple[int, ...]:

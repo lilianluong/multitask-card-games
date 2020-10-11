@@ -3,6 +3,7 @@ from enum import Enum
 
 class Suit(Enum):
     """Card suits."""
+    NO_TRUMP = -1
     CLUBS = 0
     DIAMONDS = 1
     HEARTS = 2
