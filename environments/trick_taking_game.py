@@ -1,9 +1,9 @@
 import random
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 
-from environments.util import Card, OutOfTurnException, Suit
+from util import Card, OutOfTurnException, Suit
 
 
 class TrickTakingGame:
@@ -29,11 +29,12 @@ class TrickTakingGame:
 
     The state representation is defined in reset(), while the observations are defined in _get_observations().
     """
+    name = "Trick Taking Game"
 
     def __init__(self):
         self._state = None
 
-    def reset(self):
+    def reset(self) -> Tuple[List[int], ...]:
         """
         Reset the state for a new game, and return initial observations.
 
@@ -43,7 +44,7 @@ class TrickTakingGame:
             [score of player j | 0 <= j < self.num_players] +
             [trump suit number or -1, trick leading card index or -1, index of player to move next]
 
-        :return: Tuple[List[int, ...], ...] of observations
+        :return: Tuple[List[int], ...] of observations
         """
         card_distribution = self._deal()
         self._state = (
@@ -55,13 +56,13 @@ class TrickTakingGame:
         assert len(self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the wrong size"
         return self._get_observations()
 
-    def step(self, action):
+    def step(self, action: Tuple[int, int]) -> Tuple[Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
         """
         Execute action according to the rules defined in the docstring of TrickTakingGame.
 
         :param action: Tuple[int, int], (id, i) representing player id playing card i
         :return: Tuple of the following:
-            - observation, Tuple[List[int, ...], ...] of observations
+            - observation, Tuple[List[int], ...] of observations
             - reward, Tuple[int, ...] of rewards
             - done, bool that is True if the game has ended, otherwise False
             - info, Dict of diagnostic information, currently empty
@@ -75,7 +76,7 @@ class TrickTakingGame:
 
         # Check if it is this player's turn
         if player != self.next_player:
-            return self._get_observations(), rewards, False, {"error": OutOfTurnException}
+            return self._get_observations(), tuple(rewards), False, {"error": OutOfTurnException}
 
         # Check if the card is a valid play
         if not self._is_valid_play(player, card_index):
@@ -115,9 +116,9 @@ class TrickTakingGame:
         else:
             done = False
 
-        return self._get_observations(), rewards, done, {}
+        return self._get_observations(), tuple(rewards), done, {}
 
-    def render(self, mode="world", view: int = -1):
+    def render(self, mode: str = "human", view: int = -1):
         """
         Render the state of the game.
 
@@ -125,15 +126,16 @@ class TrickTakingGame:
         :param view: int, render whole state if -1, otherwise render observation of agent view
         :return: None
         """
+        assert mode == "human", "invalid mode"
         if view == -1 or not 0 <= view < self.num_players:
             print(self._state)
         else:
             print(self._get_observations()[view])
 
-    def _deal(self) -> List[int, ...]:
+    def _deal(self) -> List[int]:
         """
         Deal cards evenly to each player, and return the positions of the cards as included in the state
-        :return: List[int, ...], where the i^th element is the index of the player who holds card i
+        :return: List[int], where the i^th element is the index of the player who holds card i
         """
         assert self.num_cards % self.num_players == 0, "cards cannot be evenly divided among the players"
         cards = []
@@ -143,7 +145,7 @@ class TrickTakingGame:
         assert len(cards) == self.num_cards, "wrong number of cards dealt"
         return cards
 
-    def _get_hands(self) -> Dict[int, List[int, ...]]:
+    def _get_hands(self) -> Dict[int, List[int]]:
         """
         Return the cards possessed by each player.
         :return: Dict, mapping i to a list of the sorted card indices in player i's hand
@@ -155,7 +157,7 @@ class TrickTakingGame:
                 hands[holding_player].append(card_index)
         return hands
 
-    def _get_observations(self) -> Tuple[List[int, ...], ...]:
+    def _get_observations(self) -> Tuple[List[int], ...]:
         """
         Extract visible information for each player to create vector of observations.
 
@@ -181,7 +183,7 @@ class TrickTakingGame:
 
     # Rule-related methods
 
-    def _end_game_bonuses(self) -> List[int, ...]:
+    def _end_game_bonuses(self) -> List[int]:
         """
         Computes additional reward assigned to each player at the end of a game.
         May be overwritten by child classes.
@@ -190,7 +192,7 @@ class TrickTakingGame:
         rewards = [0 for _ in range(self.num_players)]
         return rewards
 
-    def _end_trick(self) -> Tuple[List[int, ...], int]:
+    def _end_trick(self) -> Tuple[List[int], int]:
         """
         Determine the rewards of a completed trick, and choose the player to start the next trick.
         Should probably be overwritten by a child class.
@@ -206,8 +208,8 @@ class TrickTakingGame:
         Determine the winning player and card of a completed trick
         :return: Tuple[int, Card], the index of the winning player and their played Card
         """
-        trump_suit = Suit(self._state[-3])
-        starting_card = self.index_to_card(self._state[-2])
+        trump_suit = self.trump_suit
+        starting_card = self.trick_leader
         played_cards = [self.index_to_card(self._state[self.num_cards + i]) for i in range(self.num_players)]
 
         winning_index = -1
@@ -229,7 +231,7 @@ class TrickTakingGame:
         return random.randint(0, 3)
 
     # noinspection PyMethodMayBeStatic
-    def _get_first_player(self, card_distribution: List[int, ...]) -> int:
+    def _get_first_player(self, card_distribution: List[int]) -> int:
         """
         :param card_distribution: part of the state that shows the card positions, also the first output of _deal()
         :return: int, index of the player who gets the first turn
@@ -248,7 +250,7 @@ class TrickTakingGame:
 
         # Check if player is empty of the starting suit if different suit was played
         played_card = self.index_to_card(card_index)
-        starting_card = self.index_to_card(self._state[-2])
+        starting_card = self.trick_leader
         if played_card.suit != starting_card.suit:
             for i in range(self.num_cards):
                 if self._state[i] == player_index and self.index_to_card(i).suit == starting_card.suit:
@@ -285,6 +287,31 @@ class TrickTakingGame:
         :return: index of player who is allowed to play the next card
         """
         return self._state[-1]
+
+    @property
+    def scores(self) -> List[int]:
+        """
+        :return: list where the i^th integer is the score of player i
+        """
+        return self._state[self.num_cards + self.num_players: self.num_cards + 2 * self.num_players]
+
+    @property
+    def trump_suit(self) -> Suit:
+        """
+        :return: the trump suit
+        """
+        return Suit(self._state[-3])
+
+    @property
+    def trick_leader(self) -> Union[Card, None]:
+        """
+        :return: the card that was first played in the trick, or None if one hasn't yet been played
+        """
+        card_index = self._state[-2]
+        if card_index == -1:
+            return None
+        else:
+            return self.index_to_card(card_index)
 
     def index_to_card(self, card_index: int) -> Card:
         """

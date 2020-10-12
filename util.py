@@ -37,5 +37,10 @@ class Card:
         return "{} {}".format(self.suit, self.value)
 
 
+class Player(Enum):
+    """Types of players."""
+    HUMAN = 0
+
+
 class OutOfTurnException(Exception):
     pass
