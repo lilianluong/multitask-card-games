@@ -95,7 +95,7 @@ class TrickTakingGame:
         played_cards = self._state[num_cards: num_cards + num_players]
         if -1 not in played_cards:
             # Handle rewards
-            trick_rewards, next_leader = self._end_trick(played_cards, self._state[-3:-1])
+            trick_rewards, next_leader = self._end_trick()
             rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
             for i in range(num_cards + num_players, num_cards + 2 * num_players):
                 self._state[i] += trick_rewards[i]  # update current scores
