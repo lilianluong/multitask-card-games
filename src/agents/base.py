@@ -1,5 +1,5 @@
 import abc
-from typing import List, Tuple
+from typing import List, Set, Tuple
 
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
@@ -8,8 +8,8 @@ from util import Card
 class Agent:
     """Abstract base class for an AI agent that plays a trick taking game."""
 
-    def __init__(self, player_number: int):
-        self.game = None
+    def __init__(self, game: TrickTakingGame, player_number: int):
+        self.game = game
         self.player = player_number
 
     @abc.abstractmethod
@@ -31,6 +31,15 @@ class Agent:
         :return: the card to play
         """
         pass
+
+    def _get_hand(self, observation: List[int]) -> Set[Card]:
+        """
+        Get the hand of an agent based on an observation.
+        :param observation: observation corresponding to this player as returned by the env
+        :return: the set of cards in the player's hand
+        """
+        cards = observation[:self.game.num_cards]
+        return set(self.game.index_to_card(i) for i, in_hand in enumerate(cards) if in_hand)
 
 
 class Learner:
