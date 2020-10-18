@@ -1,4 +1,4 @@
-"""Hardcoded Learner-Agent pair for an AI that always selects a random valid card in its hand to play."""
+"""Hardcoded Learner-Agent pair for an AI that always selects a random card in its hand to play."""
 
 import random
 from typing import List, Tuple
@@ -17,8 +17,8 @@ class RandomAgent(Agent):
         self._current_observation = observation
 
     def act(self) -> Card:
-        valid_cards = self._get_hand(self._current_observation, valid_only=True)
-        return random.sample(valid_cards, 1)[0]
+        current_hand = self._get_hand(self._current_observation)
+        return random.sample(current_hand, 1)[0]
 
 
 class RandomLearner(Learner):

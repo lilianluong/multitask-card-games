@@ -9,8 +9,8 @@ class Agent:
     """Abstract base class for an AI agent that plays a trick taking game."""
 
     def __init__(self, game: TrickTakingGame, player_number: int):
-        self.game = game
-        self.player = player_number
+        self._game = game
+        self._player = player_number
 
     @abc.abstractmethod
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
@@ -32,14 +32,16 @@ class Agent:
         """
         pass
 
-    def _get_hand(self, observation: List[int]) -> Set[Card]:
+    def _get_hand(self, observation: List[int], valid_only: bool = False) -> Set[Card]:
         """
         Get the hand of an agent based on an observation.
         :param observation: observation corresponding to this player as returned by the env
+        :param valid_only: True if only valid card plays should be returned, False if entire hand should be returned
         :return: the set of cards in the player's hand
         """
-        cards = observation[:self.game.num_cards]
-        return set(self.game.index_to_card(i) for i, in_hand in enumerate(cards) if in_hand)
+        cards = observation[:self._game.num_cards]
+        return set(self._game.index_to_card(i) for i, in_hand in enumerate(cards)
+                   if in_hand and (not valid_only or self._game.is_valid_play(self._player, i)))
 
 
 class Learner:
