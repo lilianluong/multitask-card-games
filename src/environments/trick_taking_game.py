@@ -79,8 +79,8 @@ class TrickTakingGame:
             return self._get_observations(), tuple(rewards), False, {"error": OutOfTurnException}
 
         # Check if the card is a valid play
-        if not self._is_valid_play(player, card_index):
-            valid_cards = [i for i in range(num_cards) if self._is_valid_play(player, i)]
+        if not self.is_valid_play(player, card_index):
+            valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             rewards[player] -= 100  # Huge penalty for picking an invalid card!
 
@@ -238,7 +238,7 @@ class TrickTakingGame:
         """
         return 0
 
-    def _is_valid_play(self, player_index, card_index) -> bool:
+    def is_valid_play(self, player_index, card_index) -> bool:
         """
         Determines if a proposed card play is valid
         :param player_index: player making the move
@@ -251,6 +251,8 @@ class TrickTakingGame:
         # Check if player is empty of the starting suit if different suit was played
         played_card = self.index_to_card(card_index)
         starting_card = self.trick_leader
+        if starting_card is None:
+            return True
         if played_card.suit != starting_card.suit:
             for i in range(self.num_cards):
                 if self._state[i] == player_index and self.index_to_card(i).suit == starting_card.suit:
