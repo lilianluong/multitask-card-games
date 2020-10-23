@@ -274,7 +274,7 @@ class TrickTakingGame:
         """
         :return: int, the total number of cards in the game based on cards_per_suit()
         """
-        return np.prod(self.cards_per_suit).item()
+        return np.sum(self.cards_per_suit).item()
 
     @property
     def num_players(self) -> int:

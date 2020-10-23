@@ -23,7 +23,7 @@
 
       <table>
         <tr>
-  {% for item in user_player.iteritems() %}
+  {% for item in user_player.items() %}
     {% for card in item[1] %}
         <td>
       {% if card == 11 %}
@@ -75,7 +75,7 @@
 
   <table>
     <tr>
-  {% for player_item in player_current_cards.iteritems() %}
+  {% for player_item in player_current_cards.items() %}
     <td>
     <p><b>{{ player_item[0] }} ( {{ players_score[player_item[0]] }} )</b></p>
     {% if 'card' in player_item[1] %}
@@ -84,6 +84,7 @@
         <span class="rank">J</span>
         <span class="suit">&{{ player_item[1]['type'] if player_item[1]['type'] != 'diamonds' else 'diams' }};</span>
       </div>
+
     {% elif player_item[1]['card'] == 12 %}
       <div class="card rank-q {{ player_item[1]['type'] if player_item[1]['type'] != 'diamonds' else 'diams' }}">
         <span class="rank">Q</span>
