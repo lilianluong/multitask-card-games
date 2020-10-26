@@ -27,62 +27,47 @@ class DQN(nn.Module):
 		x = F.relu(self.fc2(x))
 		return self.fc3(x)
 
-
 class DQNAgent(Agent):
-	def __init__(self, game: TrickTakingGame, player_number: int):
+	def __init__(self, game: TrickTakingGame, player_number: int, model: DQN):
+		
 		super(DQNAgent).__init__(game, player_number)
         self._current_observation = None
-
-        self.observation_size = 33 #24 cards + 4 players + 4 scores + 1 current player index
-        self.action_size = 1 
-        self.memory = deque(maxlen=100) #modification to dqn to preserve recent only
-        self.gamma = 0.95 # discount rate
-        self.epsilon = 1.0 # exploration rate
-        self.epsilon_min = 0.01 # min exploration
-        self.epsilon_decay = 0.995 # to decrease exploration rate over time
-        self.learning_rate = 5E-4
-        self.update_every = 3
-        self.model = DQN(self.observation_size, self.action_size).to(device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.step = 0
-
-    def memorize(self, observation, action, reward, next_observation, done):
-    	self.memory.append((observation, action, reward, next_observation, done))
+        self.model = model
 
 	def act(self): 
 		if np.random.rand() <= self.epsilon:
 			valid_cards = self._get_hand(self._current_observation, valid_only=True)
         	return random.sample(valid_cards, 1)[0]
 
-
         action_values = self.model.predict(torch.FloatTensor(self._current_observation))
         return np.argmax(action_values[0])
-
-    def replay(self, batch_size):
-    	batch = random.sample(self.memory, batch_size)
-    	criterion = torch.nn.MSELoss()
-
-    	for observation, action, reward, next_observation, done in batch:
-            target = reward
-            if not done:
-            	target = reward + self.gamma*np.amax(self.model.predict(next_observation)[0])
-            pred = self.model.predict(observation).gather(1, action)
-            loss = criterion(pred, target).to_device()
-            self.optimizer.zero_grad()
-        	loss.backward()
-        	self.optimizer.step()
-        
-        if self.epsilon > self.epsilon_min:
-        	self.epsilon *= self.epsilon_decay
 
 	def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
         self._current_observation = observation
 
 class DQNLearner(Learner):
 
+	def __init__(self):
+
+		self.observation_size = 33 #24 cards + 4 players + 4 scores + 1 current player index
+        self.action_size = 24 
+        self.memory = deque(maxlen=100) #modification to dqn to preserve recent only
+        self.gamma = 0.95 # discount rate
+        self.epsilon = 1.0 # exploration rate
+        self.epsilon_min = 0.01 # min exploration
+        self.epsilon_decay = 0.995 # to decrease exploration rate over time
+        self.learning_rate = 5E-4
+        self.model = DQN(self.observation_size, self.action_size).to(device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        
+        self.update_every = 3
+        self.step = 0
+
 	def train(self, tasks: List[TrickTakingGame.__class__], episodes: int):
 		for task in tasks:
-			agent = self.initialize_agent(task, 1)
+			player_setting = [] #TODO
+			game = Game(task, player_setting)
+			agent = self.initialize_agent(game, 1)
 			scores = []
 			for i in range(episodes):
 				score = 0
@@ -102,4 +87,24 @@ class DQNLearner(Learner):
 
     def initialize_agent(self, game: TrickTakingGame, player_number: int) -> Agent:
         return DQNAgent(game, player_number)
+
+    def memorize(self, observation, action, reward, next_observation, done):
+    	self.memory.append((observation, action, reward, next_observation, done))
+
+   	def replay(self, batch_size):
+    	batch = random.sample(self.memory, batch_size)
+    	criterion = torch.nn.CrossEntropyLoss()
+
+    	for observation, action, reward, next_observation, done in batch:
+            target = reward
+            if not done:
+            	target = reward + self.gamma*np.amax(self.model.predict(next_observation)[0])
+            pred = self.model.predict(observation).gather(1, action)
+            loss = criterion(pred, target).to_device()
+            self.optimizer.zero_grad()
+        	loss.backward()
+        	self.optimizer.step()
+        
+        if self.epsilon > self.epsilon_min:
+        	self.epsilon *= self.epsilon_decay
 
