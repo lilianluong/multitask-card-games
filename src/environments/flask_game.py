@@ -2,19 +2,39 @@
 import queue
 import threading
 from collections import defaultdict
+from typing import List
 
 from flask import Flask, render_template, request
 
+from agents.base import Agent
+from agents.human import Human
 from environments.hearts import SimpleHearts
 from environments.trick_taking_game import TrickTakingGame
 from game import Game
-from util import Card, Suit, Player
+from util import Card, Suit
 
 
 class FlaskGame(Game):
-    def __init__(self, game: TrickTakingGame.__class__):
-        super().__init__(game)
-        self.input_queue = queue.Queue()
+    """
+    Singleton class that can display contents of game on flask server
+    """
+    __instance = None
+
+    @staticmethod
+    def getInstance(game: TrickTakingGame.__class__ = None,
+                    player_setting: List[Agent.__class__] = None):
+        """ Static access method. """
+        if FlaskGame.__instance is None:
+            FlaskGame.__instance = FlaskGame(game, player_setting)
+        return FlaskGame.__instance
+
+    def __init__(self, game: TrickTakingGame.__class__,
+                 player_setting: List[Agent.__class__] = None):
+        if FlaskGame.__instance is not None:
+            raise Exception("This class is a singleton!")
+        else:
+            super().__init__(game, player_setting)
+            self.input_queue = queue.Queue()
 
     def _choose_action_human(self, player: int) -> Card:
         """
@@ -33,7 +53,7 @@ class FlaskGame(Game):
             data = request.form  # contains player input in dict form fields: card=rank, type=suit
             # add selection to queue
             if "card" in data:
-                card = Card(Suit(data['type']), int(data["card"]))
+                card = Card(Suit[data['type'].upper()], int(data["card"]))
                 self.input_queue.put(card)
 
         player_current_cards = dict()
@@ -45,9 +65,10 @@ class FlaskGame(Game):
         log_message = "Please select a card"
 
         # assumes only 1 human player and takes first one
-        human_players = self._player_types[self._player_types == Player.HUMAN]
+        human_players = self._agent_list[isinstance(self._agent_list, Human)]
         # assert len(human_players)==1, f"need only 1 human player, have {len(human_players)}"
-        human_index = [idx for idx, element in enumerate(self._player_types) if element == Player.HUMAN][0]
+        human_index = \
+            [idx for idx, element in enumerate(self._agent_list) if isinstance(element, Human)][0]
         player_state = defaultdict(list)  # needs to be dict of suit:ranks in suit
         hand = self._game._get_hands()[human_index]
         for card_ind in hand:
@@ -65,15 +86,8 @@ class FlaskGame(Game):
 
 app = Flask(__name__, template_folder="../../templates", static_folder="../../static")
 app.config['DEBUG'] = False
-game = FlaskGame(SimpleHearts)
-
+threading.Thread(target=app.run).start()
 
 @app.route('/play', methods=['POST', 'GET'])
 def handle_website():
-    return game.render()
-
-
-if __name__ == "__main__":
-    # test for class
-    threading.Thread(target=app.run).start()
-    game.run()
+    return FlaskGame.getInstance().render()
