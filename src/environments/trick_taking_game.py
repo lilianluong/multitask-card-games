@@ -182,7 +182,7 @@ class TrickTakingGame:
         Extract visible information for each player to create vector of observations.
 
         An observation is structured as follows:
-            [0 if card i not in hand, 1 if in hand, 2 if discarded | 0 <= i < self.num_cards] +
+            [0 if card i not in hand, 1 if in hand, -1 if discarded | 0 <= i < self.num_cards] +
             [index of card in play or -1 if no card yet played by player j | 0 <= j <
             self.num_players] +
             [score of player j | 0 <= j < self.num_players] +
