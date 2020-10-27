@@ -349,7 +349,7 @@ class TrickTakingGame:
         :return: dictionary mapping player ids to card they have played in this trick
         """
         card_list = self._state[self.num_cards:self.num_cards + self.num_players]
-        trick_dict = {i: self.index_to_card(el) for i, el in enumerate(card_list) if el is not -1}
+        trick_dict = {i: self.index_to_card(el) for i, el in enumerate(card_list) if el != -1}
         return trick_dict
 
     def index_to_card(self, card_index: int) -> Card:
