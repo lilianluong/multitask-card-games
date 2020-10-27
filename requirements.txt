@@ -1,1 +1,4 @@
-Flask
+Flask~=1.1.2
+
+torch~=1.6.0+cu101
+numpy~=1.19.2
