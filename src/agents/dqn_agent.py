@@ -1,5 +1,6 @@
 import random
 from collections import deque
+from datetime import datetime
 from typing import List, Tuple
 
 import numpy as np
@@ -7,11 +8,13 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 
 from agents.base import Learner
 from agents.belief_agent import BeliefBasedAgent
 from environments.hearts import SimpleHearts
 from environments.trick_taking_game import TrickTakingGame
+from evaluators import evaluate_random
 from game import Game
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -87,7 +90,7 @@ class DQNLearner(Learner):
         self.learning_rate = 5E-4
 
         # training hyperparams
-        self.num_epochs = 100000
+        self.num_epochs = 10000
         self.games_per_epoch = 3
         self.batch_size = 20
         self.num_batches = 2
@@ -96,8 +99,11 @@ class DQNLearner(Learner):
         self.model = DQN(self.observation_size, self.action_size).to(device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        self.update_every = 3
+        self.evaluate_every = 50  # number of epochs to evaluate between
         self.step = 0
+
+        self.writer = SummaryWriter(f"runs/dqn {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+        # TODO: add network graph to tensborboard
 
     def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
         for task in tasks:
@@ -114,8 +120,19 @@ class DQNLearner(Learner):
                     barbs = game.get_barbs()
                     self.memorize(barbs)
                 # update policy
+                losses = []
                 for _ in range(self.num_batches):
-                    self.replay(self.batch_size)
+                    loss = self.replay(self.batch_size).item()
+                    losses.append(loss)
+
+                self.writer.add_scalar("avg_training_loss", np.mean(losses), epoch)
+
+                # evaluate
+                if (epoch + 1) % self.evaluate_every == 0:
+                    winrate, avg_score, scores = evaluate_random(DQNAgent, self.model,
+                                                                 num_trials=25)
+                    self.writer.add_scalar("eval_winrate", winrate, epoch)
+                    self.writer.add_scalar("eval_score", avg_score, epoch)
 
                 if self.epsilon > self.epsilon_min:
                     self.epsilon *= self.epsilon_decay
@@ -154,3 +171,4 @@ class DQNLearner(Learner):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        return loss
