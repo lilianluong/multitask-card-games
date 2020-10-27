@@ -10,7 +10,7 @@ from util import Card
 
 class RandomAgent(Agent):
     def __init__(self, game: TrickTakingGame, player_number: int):
-        super(RandomAgent).__init__(game, player_number)
+        super().__init__(game, player_number)
         self._current_observation = None
 
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
