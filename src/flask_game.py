@@ -2,7 +2,7 @@
 import queue
 import threading
 from collections import defaultdict
-from typing import List
+from typing import List, Dict, Any
 
 from flask import Flask, render_template, request
 
@@ -28,11 +28,12 @@ class FlaskGame(Game):
         return FlaskGame.__instance
 
     def __init__(self, game: TrickTakingGame.__class__,
-                 player_setting: List[Agent.__class__] = None):
+                 player_setting: List[Agent.__class__] = None,
+                 agent_params: List[Dict[str, Any]] = None):
         if FlaskGame.__instance is not None:
             raise Exception("This class is a singleton!")
         else:
-            super().__init__(game, player_setting)
+            super().__init__(game, player_setting, agent_params)
             self.input_queue = queue.Queue()
             self.render_queue = queue.Queue()
             self.first = True

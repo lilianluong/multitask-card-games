@@ -1,6 +1,7 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 from agents.base import Agent
+from agents.belief_agent import BeliefBasedAgent
 from agents.human import Human
 from agents.random_agent import RandomAgent
 from environments.trick_taking_game import TrickTakingGame
@@ -16,14 +17,18 @@ class Game:
     """
 
     def __init__(self, game: TrickTakingGame.__class__,
-                 player_setting: List[Agent.__class__] = None):
+                 player_setting: List[Agent.__class__] = None,
+                 agent_params: List[Dict[str, Any]] = None,
+                 game_params: Dict[str, Any] = None):
         """
         Initialize a new game.
 
         :param game: either TrickTakingGame, or a class that inherits from it, the game to be played
         :param player_setting: List[Player], defining the type of player in order of their seated
+        :param agent_params: list containing parameter to be passed to agent i
         position
         """
+
         self._game = game()
 
         if player_setting is None:
@@ -31,10 +36,19 @@ class Game:
         assert len(
             player_setting) == self._game.num_players, "number of players doesn't fit the game " \
                                                        "requirements"
-        self._agent_list = [player_class(self._game, i) for i, player_class in
+
+        if agent_params is None:
+            agent_params = [{}] * len(player_setting)
+
+        if game_params is None:
+            game_params = {}
+
+        self._agent_list = [player_class(self._game, i, **agent_params[i]) for i, player_class in
                             enumerate(player_setting)]
 
         self._observations = None
+        self._barbs = []
+        self._game_params = game_params
 
     def run(self) -> List[int]:
         """
@@ -57,7 +71,8 @@ class Game:
             self._print_report(round_number, next_player, selected_card, observations, rewards)
             self._observations = observations
             self._update_observations(next_player, selected_card, observations, rewards)
-            round_number+=1
+            self._collect_barbs()
+            round_number += 1
 
         # Game has finished
         self._game_ended()
@@ -86,7 +101,8 @@ class Game:
         """
         # TODO: improve printout
         print(
-            f"Round {round_number}: Player {player_who_went} just played {card_played}. Observations of players: "
+            f"Round {round_number}: Player {player_who_went} just played {card_played}. "
+            f"Observations of players: "
             f"{observations}. Player rewards: {rewards}")
 
     def _game_ended(self):
@@ -109,7 +125,7 @@ class Game:
             return self._choose_action_human(player)
 
         agent = self._agent_list[player]
-        return agent.act()
+        return agent.act(self._game_params.get("epsilon", 0))
 
     def _choose_action_human(self, player: int) -> Card:
         """
@@ -135,3 +151,13 @@ class Game:
             agent.observe((player_who_went, card_idx),
                           observations[i],
                           rewards[i])
+
+    def _collect_barbs(self):
+        for agent in self._agent_list:
+            if issubclass(agent.__class__, BeliefBasedAgent):
+                barb = agent.barb()
+                if barb is not None:
+                    self._barbs.append(barb)
+
+    def get_barbs(self):
+        return self._barbs

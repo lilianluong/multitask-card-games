@@ -1,6 +1,8 @@
 import abc
 from typing import List, Set, Tuple
 
+from torch import nn
+
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
 
@@ -15,7 +17,8 @@ class Agent:
     @abc.abstractmethod
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
         """
-        Handle an observation from the environment, and update any personal records/current belief/etc.
+        Handle an observation from the environment, and update any personal records/current
+        belief/etc.
 
         :param action: tuple of the player who moved and the index of the card they played
         :param observation: the observation corresponding to this player as returned by the env
@@ -25,7 +28,7 @@ class Agent:
         pass
 
     @abc.abstractmethod
-    def act(self) -> Card:
+    def act(self, epsilon: float = 0) -> Card:
         """
         Based on the current observation/belief/known state, select a Card to play.
         :return: the card to play
@@ -36,7 +39,8 @@ class Agent:
         """
         Get the hand of an agent based on an observation.
         :param observation: observation corresponding to this player as returned by the env
-        :param valid_only: True if only valid card plays should be returned, False if entire hand should be returned
+        :param valid_only: True if only valid card plays should be returned, False if entire hand
+        should be returned
         :return: the set of cards in the player's hand
         """
         cards = observation[:self._game.num_cards]
@@ -48,12 +52,12 @@ class Learner:
     """Abstract base class for an AI that learns to play trick taking games."""
 
     @abc.abstractmethod
-    def train(self, tasks: List[TrickTakingGame.__class__]):
+    def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
         """
         Given a list of trick taking game environment classes, train on them.
 
         :param tasks: List of environment classes, which inherit from TrickTakingGame
-        :return: None
+        :return: Trained model
         """
         pass
 

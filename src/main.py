@@ -7,6 +7,5 @@ def test_hearts():
     result = game.run()
     print(result)
 
-
 if __name__ == "__main__":
     test_hearts()

@@ -13,7 +13,7 @@ class BeliefBasedAgent(Agent):
     """
 
     def __init__(self, game: TrickTakingGame, player_number: int):
-        super(BeliefBasedAgent).__init__(game, player_number)
+        super().__init__(game, player_number)
         self._last_belief = None
         self._last_action = None
         self._last_reward = None
@@ -44,7 +44,7 @@ class BeliefBasedAgent(Agent):
         return None
 
     @abc.abstractmethod
-    def act(self) -> Card:
+    def act(self, epsilon: float = 0) -> Card:
         """
         Based on the current observation/belief/known state, select a Card to play.
         :return: the card to play

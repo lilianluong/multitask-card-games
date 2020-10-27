@@ -14,5 +14,5 @@ class Human(Agent):
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
         self._current_observation = observation
 
-    def act(self) -> Card:
+    def act(self, epsilon: float = 0) -> Card:
         raise ValueError("Human agents can't act")
