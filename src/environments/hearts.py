@@ -24,7 +24,7 @@ class SimpleHearts(TrickTakingGame):
         scores = self.scores
         loser = min(range(self.num_players), key=lambda i: scores[i])
         if scores[loser] == -17:
-            return [0 if i == loser else -17 for i in range(self.num_players)]
+            return [17 if i == loser else -17 for i in range(self.num_players)]
         return [0 for _ in range(self.num_players)]
 
     def _end_trick(self) -> Tuple[List[int], int]:
