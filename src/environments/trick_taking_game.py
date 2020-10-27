@@ -10,24 +10,33 @@ class TrickTakingGame:
     """
     Base gym-inspired environment for a trick taking card game.
 
-    TrickTakingGame maintains a _state that encodes the position of every card and game information such
+    TrickTakingGame maintains a _state that encodes the position of every card and game
+    information such
     as cards in play, the score of each player, and whose turn it is.
 
     All players interact with the same interface.
-    An action is defined by (id, i) where id is the player's index and i is the index of the card they intend to play.
+    An action is defined by (id, i) where id is the player's index and i is the index of the card
+    they intend to play.
         - if id != next player to move, no transition happens and zero reward is returned
-        - if card i is not held by player id, then a random card is played and a large negative reward is added
+        - if card i is not held by player id, then a random card is played and a large negative
+        reward is added
         - otherwise, player id plays card i
             - if the trick finishes, the score changes and the next player is set
-            - if the trick is ongoing, card i is marked as being played and the turn moves to the next player
+            - if the trick is ongoing, card i is marked as being played and the turn moves to the
+            next player
 
-    Each reset() and step(action) returns a tuple of observations specific to each player, which comprises of only
-    the information visible to that player. The reward is similarly a tuple of integers for each player.
+    Each reset() and step(action) returns a tuple of observations specific to each player,
+    which comprises of only
+    the information visible to that player. The reward is similarly a tuple of integers for each
+    player.
 
-    Trick taking games should be implemented as classes that inherit TrickTakingGame and implement its abstract methods.
-    They may also want to override some methods that define properties (e.g. cards_per_suit) or rules for each game.
+    Trick taking games should be implemented as classes that inherit TrickTakingGame and
+    implement its abstract methods.
+    They may also want to override some methods that define properties (e.g. cards_per_suit) or
+    rules for each game.
 
-    The state representation is defined in reset(), while the observations are defined in _get_observations().
+    The state representation is defined in reset(), while the observations are defined in
+    _get_observations().
     """
     name = "Trick Taking Game"
 
@@ -40,7 +49,8 @@ class TrickTakingGame:
 
         State representation:
             [index of player holding card i or -1 if discarded| 0 <= i < self.num_cards] +
-            [index of card in play or -1 if no card yet played by player j | 0 <= j < self.num_players] +
+            [index of card in play or -1 if no card yet played by player j | 0 <= j <
+            self.num_players] +
             [score of player j | 0 <= j < self.num_players] +
             [trump suit number or -1, trick leading card index or -1, index of player to move next]
 
@@ -48,15 +58,18 @@ class TrickTakingGame:
         """
         card_distribution = self._deal()
         self._state = (
-            card_distribution +
-            [-1 for _ in range(self.num_players)] +
-            [0 for _ in range(self.num_players)] +
-            [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
+                card_distribution +
+                [-1 for _ in range(self.num_players)] +
+                [0 for _ in range(self.num_players)] +
+                [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
         )
-        assert len(self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the wrong size"
+        assert len(
+            self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
+                                                                       "wrong size"
         return self._get_observations()
 
-    def step(self, action: Tuple[int, int]) -> Tuple[Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
+    def step(self, action: Tuple[int, int]) -> Tuple[
+        Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
         """
         Execute action according to the rules defined in the docstring of TrickTakingGame.
 
@@ -69,6 +82,7 @@ class TrickTakingGame:
         """
         assert len(action) == 2, "invalid action"
         player, card_index = action
+        assert card_index < self.num_cards, "Trying to pick card with index higher than allowed"
         num_cards = self.num_cards
         num_players = self.num_players
 
@@ -91,6 +105,8 @@ class TrickTakingGame:
         if self._state[-2] == -1:
             # Trick leader
             self._state[-2] = card_index
+        # update next player
+        self._state[-1] = (player + 1) % num_players
 
         # Check if trick completed
         played_cards = self._state[num_cards: num_cards + num_players]
@@ -98,8 +114,9 @@ class TrickTakingGame:
             # Handle rewards
             trick_rewards, next_leader = self._end_trick()
             rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
-            for i in range(num_cards + num_players, num_cards + 2 * num_players):
-                self._state[i] += trick_rewards[i]  # update current scores
+            for i in range(num_players):
+                offset = num_cards + num_players  # index into state correctly
+                self._state[offset+i] += trick_rewards[i]  # update current scores
 
             # Reset trick
             for i in range(num_cards, num_cards + num_players):
@@ -134,10 +151,12 @@ class TrickTakingGame:
 
     def _deal(self) -> List[int]:
         """
-        Deal cards evenly to each player, and return the positions of the cards as included in the state
+        Deal cards evenly to each player, and return the positions of the cards as included in
+        the state
         :return: List[int], where the i^th element is the index of the player who holds card i
         """
-        assert self.num_cards % self.num_players == 0, "cards cannot be evenly divided among the players"
+        assert self.num_cards % self.num_players == 0, "cards cannot be evenly divided among the " \
+                                                       "players"
         cards = []
         for i in range(self.num_players):
             cards += [i for _ in range(self.num_cards // self.num_players)]
@@ -162,8 +181,9 @@ class TrickTakingGame:
         Extract visible information for each player to create vector of observations.
 
         An observation is structured as follows:
-            [0 if card i not in hand, 1 if in hand, 2 if discarded | 0 <= i < self.num_cards] +
-            [index of card in play or -1 if no card yet played by player j | 0 <= j < self.num_players] +
+            [0 if card i not in hand, 1 if in hand, -1 if discarded | 0 <= i < self.num_cards] +
+            [index of card in play or -1 if no card yet played by player j | 0 <= j <
+            self.num_players] +
             [score of player j | 0 <= j < self.num_players] +
             [index of player to move next]
 
@@ -196,7 +216,8 @@ class TrickTakingGame:
         """
         Determine the rewards of a completed trick, and choose the player to start the next trick.
         Should probably be overwritten by a child class.
-        :return: Tuple, of a vector of rewards for the current trick and the index of the next player to start
+        :return: Tuple, of a vector of rewards for the current trick and the index of the next
+        player to start
         """
         winning_player, winning_card = self._get_trick_winner()
         rewards = [0 for _ in range(self.num_players)]
@@ -210,7 +231,8 @@ class TrickTakingGame:
         """
         trump_suit = self.trump_suit
         starting_card = self.trick_leader
-        played_cards = [self.index_to_card(self._state[self.num_cards + i]) for i in range(self.num_players)]
+        played_cards = [self.index_to_card(self._state[self.num_cards + i]) for i in
+                        range(self.num_players)]
 
         winning_index = -1
         winning_card = starting_card
@@ -233,7 +255,8 @@ class TrickTakingGame:
     # noinspection PyMethodMayBeStatic
     def _get_first_player(self, card_distribution: List[int]) -> int:
         """
-        :param card_distribution: part of the state that shows the card positions, also the first output of _deal()
+        :param card_distribution: part of the state that shows the card positions, also the first
+        output of _deal()
         :return: int, index of the player who gets the first turn
         """
         return 0
@@ -255,7 +278,8 @@ class TrickTakingGame:
             return True
         if played_card.suit != starting_card.suit:
             for i in range(self.num_cards):
-                if self._state[i] == player_index and self.index_to_card(i).suit == starting_card.suit:
+                if self._state[i] == player_index and self.index_to_card(
+                        i).suit == starting_card.suit:
                     return False
 
         return True
@@ -274,7 +298,7 @@ class TrickTakingGame:
         """
         :return: int, the total number of cards in the game based on cards_per_suit()
         """
-        return np.prod(self.cards_per_suit).item()
+        return np.sum(self.cards_per_suit).item()
 
     @property
     def num_players(self) -> int:
