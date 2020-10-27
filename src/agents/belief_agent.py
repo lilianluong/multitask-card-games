@@ -39,7 +39,9 @@ class BeliefBasedAgent(Agent):
         :return: (old belief, action, reward, new belief) experience if the last action taken was by this agent,
                  else None
         """
-        return self._last_belief[:], self._last_action[1], self._last_reward, self._belief[:]
+        if self._last_action[0] == self._player:
+            return self._last_belief[:], self._last_action[1], self._last_reward, self._belief[:]
+        return None
 
     @abc.abstractmethod
     def act(self) -> Card:
