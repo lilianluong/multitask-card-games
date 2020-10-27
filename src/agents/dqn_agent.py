@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch import nn
 
-from agents.base import Learner, Agent
+from agents.base import Learner
 from agents.belief_agent import BeliefBasedAgent
 from environments.hearts import SimpleHearts
 from environments.trick_taking_game import TrickTakingGame
@@ -18,7 +18,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class DQN(nn.Module):
-    def __init__(self, observation_size, action_size, H1=16, H2=16):
+    def __init__(self, observation_size, action_size, H1=50, H2=50):
         """
 
         :param observation_size: Size of belief as defined in belief_agent.py
@@ -59,8 +59,9 @@ class DQNAgent(BeliefBasedAgent):
             return random.sample(valid_cards, 1)[0]
 
         # reformat observation into following format: hand +
-        action_values = self.model.predict(torch.FloatTensor(self._current_observation))
-        return np.argmax(action_values[0])
+        action_values = self.model.forward(torch.FloatTensor(self._belief).to(device))
+        chosen_card = torch.argmax(action_values).item()
+        return self._game.index_to_card(chosen_card)
 
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
         super().observe(action, observation, reward)
@@ -86,9 +87,9 @@ class DQNLearner(Learner):
         self.learning_rate = 5E-4
 
         # training hyperparams
-        self.num_epochs = 100
+        self.num_epochs = 100000
         self.games_per_epoch = 3
-        self.batch_size = 32
+        self.batch_size = 20
         self.num_batches = 2
 
         # Init agents and trainers
@@ -102,9 +103,13 @@ class DQNLearner(Learner):
         for task in tasks:
             for epoch in range(self.num_epochs):
                 # collect experiences
+                print(f"Starting epoch {epoch}/{self.num_epochs}")
                 for game_num in range(self.games_per_epoch):
+                    # print(
+                    #     f"Running game {game_num}/{self.games_per_epoch} in epoch {epoch}/"
+                    #     f"{self.num_epochs}")
                     game = Game(task, [DQNAgent] * 4, [{"model": self.model} for _ in range(4)],
-                                {"epsilon": self.epsilon})
+                                {"epsilon": self.epsilon, "verbose": False})
                     result = game.run()
                     barbs = game.get_barbs()
                     self.memorize(barbs)
@@ -112,10 +117,10 @@ class DQNLearner(Learner):
                 for _ in range(self.num_batches):
                     self.replay(self.batch_size)
 
-        return self.model
+                if self.epsilon > self.epsilon_min:
+                    self.epsilon *= self.epsilon_decay
 
-    def initialize_agent(self, game: TrickTakingGame, player_number: int) -> Agent:
-        return DQNAgent(game, player_number)
+        return self.model
 
     def memorize(self, barbs):
         """
@@ -127,17 +132,25 @@ class DQNLearner(Learner):
 
     def replay(self, batch_size):
         batch = random.sample(self.memory, batch_size)
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.MSELoss()  # tutorial uses torch.nn.SmoothL1Loss
 
-        for belief, action, reward, next_belief, done in batch:
-            target = reward
-            if not done:
-                target = reward + self.gamma * np.amax(self.model.predict(next_belief)[0])
-            pred = self.model.predict(belief).gather(1, action)
-            loss = criterion(pred, target).to_device()
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+        # TODO: what about terminal behavior?
+        # Batch data correctly
+        batch = np.asarray(batch)
+        belief = np.vstack(batch[:, 0])
+        action = np.vstack(batch[:, 1])
+        reward = np.vstack(batch[:, 2])
+        next_belief = np.vstack(batch[:, 3])
 
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+        belief, next_belief = torch.from_numpy(belief).type(torch.FloatTensor).to(device), \
+                              torch.from_numpy(next_belief).type(torch.FloatTensor).to(device)
+        # Linear expects dims batch size x feature size (feat size is observation size here)
+        target = torch.from_numpy(reward).to(device) + self.gamma * torch.argmax(
+            self.model.forward(next_belief), dim=1, keepdim=True)
+        pred = self.model.forward(belief)
+        pred = torch.gather(pred, 1, torch.from_numpy(action).to(device)).to(
+            device)  # convert prediction
+        loss = criterion(pred, target).to(device)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()

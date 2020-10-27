@@ -68,7 +68,8 @@ class Game:
             selected_card = self._choose_action(next_player)
             card_index = self._game.card_to_index(selected_card)
             observations, rewards, done, info = self._game.step((next_player, card_index))
-            self._print_report(round_number, next_player, selected_card, observations, rewards)
+            if self._game_params.get("verbose", True):
+                self._print_report(round_number, next_player, selected_card, observations, rewards)
             self._observations = observations
             self._update_observations(next_player, selected_card, observations, rewards)
             self._collect_barbs()
@@ -112,7 +113,7 @@ class Game:
         :return: None
         """
         # TODO: improve
-        print("Game Ended!")
+        pass
 
     def _choose_action(self, player: int) -> Card:
         """

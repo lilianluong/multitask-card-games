@@ -24,7 +24,7 @@ def eval(model):
     with torch.no_grad:
         for _ in range(10):
             game = Game(SimpleHearts, [DQNAgent] + [RandomAgent] * 3,
-                        agent_params=[{"model": model}, {}, {}, {}])
+                        agent_params=[{"model": model}, {}, {}, {}],)
             result = game.run()
             results.append(result)
     return results
