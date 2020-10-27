@@ -12,6 +12,7 @@ class Suit(Enum):
 
 class Card:
     """An immutable card."""
+
     def __init__(self, suit: Suit, value: int):
         self._suit = suit
         self._value = value
@@ -23,23 +24,18 @@ class Card:
     @property
     def value(self) -> int:
         return self._value
-    
+
     def __eq__(self, other):
         return self.suit == other.suit and self.value == other.value
 
     def __hash__(self):
-        return self.suit, self.value
+        return hash((self.suit, self.value))
 
     def __repr__(self):
         return "Card<{}, {}>".format(self.suit, self.value)
 
     def __str__(self):
         return "{} {}".format(self.suit, self.value)
-
-
-class Player(Enum):
-    """Types of players."""
-    HUMAN = 0
 
 
 class OutOfTurnException(Exception):
