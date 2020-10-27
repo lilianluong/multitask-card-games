@@ -23,8 +23,8 @@ class SimpleHearts(TrickTakingGame):
     def _end_game_bonuses(self) -> List[int]:
         scores = self.scores
         loser = min(range(self.num_players), key=lambda i: scores[i])
-        if scores[loser] == -15:
-            return [0 if i == loser else -15 for i in range(self.num_players)]
+        if scores[loser] == -17:
+            return [17 if i == loser else -17 for i in range(self.num_players)]
         return [0 for _ in range(self.num_players)]
 
     def _end_trick(self) -> Tuple[List[int], int]:
@@ -35,7 +35,7 @@ class SimpleHearts(TrickTakingGame):
             if card.suit == Suit.HEARTS:
                 rewards[winning_player] -= 1
             if card == Card(Suit.SPADES, 5):
-                rewards[winning_player] -= 7
+                rewards[winning_player] -= 9
         return rewards, winning_player
 
     @property

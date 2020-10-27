@@ -131,6 +131,9 @@ class TrickTakingGame:
             # apply score bonuses
             bonus_rewards = self._end_game_bonuses()
             rewards = [rewards[i] + bonus_rewards[i] for i in range(num_players)]
+            for i in range(num_players):
+                offset = num_cards + num_players
+                self._state[offset + i] += bonus_rewards[i]
         else:
             done = False
 
