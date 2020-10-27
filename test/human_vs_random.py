@@ -1,7 +1,7 @@
 # Created by Patrick Kao
 from agents.human import Human
 from agents.random_agent import RandomAgent
-from environments.flask_game import FlaskGame
+from flask_game import FlaskGame
 from environments.hearts import SimpleHearts
 
 

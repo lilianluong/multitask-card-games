@@ -8,7 +8,6 @@ from flask import Flask, render_template, request
 
 from agents.base import Agent
 from agents.human import Human
-from environments.hearts import SimpleHearts
 from environments.trick_taking_game import TrickTakingGame
 from game import Game
 from util import Card, Suit
@@ -35,6 +34,8 @@ class FlaskGame(Game):
         else:
             super().__init__(game, player_setting)
             self.input_queue = queue.Queue()
+            self.render_queue = queue.Queue()
+            self.first = True
 
     def _choose_action_human(self, player: int) -> Card:
         """
@@ -55,13 +56,15 @@ class FlaskGame(Game):
             if "card" in data:
                 card = Card(Suit[data['type'].upper()], int(data["card"]))
                 self.input_queue.put(card)
+                # wait for game update
+                self.render_queue.get()
 
-        player_current_cards = dict()
-        player_current_cards['0'] = {}
-        player_current_cards['1'] = {}
-        player_current_cards['2'] = {}
-        player_current_cards['3'] = {}
-
+        trick_cards = self._game.current_trick()
+        player_current_cards = defaultdict(dict)
+        for player, card in trick_cards.items():
+            player_current_cards[player]["type"] = card.suit.name.lower()
+            player_current_cards[player]["card"] = card.value
+        
         log_message = "Please select a card"
 
         # assumes only 1 human player and takes first one
@@ -83,11 +86,21 @@ class FlaskGame(Game):
                                user_player=player_state,
                                players_score=players_score)
 
+    def _choose_action(self, player: int) -> Card:
+        # update render queue
+        if isinstance(self._agent_list[player], Human):
+            if self.first:
+                self.first = False
+            else:
+                self.render_queue.put(0)  # any value
+        return super()._choose_action(player)
 
-app = Flask(__name__, template_folder="../../templates", static_folder="../../static")
+
+app = Flask(__name__, template_folder="../templates", static_folder="../static")
 app.config['DEBUG'] = False
 threading.Thread(target=app.run).start()
 
+
 @app.route('/play', methods=['POST', 'GET'])
 def handle_website():
-    return FlaskGame.getInstance().render()
+    return FlaskGame.getInstance().render(request.method)

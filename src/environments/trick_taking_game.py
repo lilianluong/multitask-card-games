@@ -97,6 +97,7 @@ class TrickTakingGame:
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             rewards[player] -= 100  # Huge penalty for picking an invalid card!
+            print("Invalid play")
 
         # Play the card
         self._state[card_index] = -1
@@ -116,7 +117,7 @@ class TrickTakingGame:
             rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
             for i in range(num_players):
                 offset = num_cards + num_players  # index into state correctly
-                self._state[offset+i] += trick_rewards[i]  # update current scores
+                self._state[offset + i] += trick_rewards[i]  # update current scores
 
             # Reset trick
             for i in range(num_cards, num_cards + num_players):
@@ -338,6 +339,15 @@ class TrickTakingGame:
             return None
         else:
             return self.index_to_card(card_index)
+
+    def current_trick(self) -> Dict[int, Card]:
+        """
+
+        :return: dictionary mapping player ids to card they have played in this trick
+        """
+        card_list = self._state[self.num_cards:self.num_cards + self.num_players]
+        trick_dict = {i: self.index_to_card(el) for i, el in enumerate(card_list) if el is not -1}
+        return trick_dict
 
     def index_to_card(self, card_index: int) -> Card:
         """

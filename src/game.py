@@ -47,15 +47,17 @@ class Game:
                                   [None] * len(self._agent_list))  # set initial observations
         done = False
 
+        round_number = 0
         # Play the game
         while not done:
             next_player = self._game.next_player
             selected_card = self._choose_action(next_player)
             card_index = self._game.card_to_index(selected_card)
             observations, rewards, done, info = self._game.step((next_player, card_index))
-            self._print_report(next_player, selected_card, observations, rewards)
+            self._print_report(round_number, next_player, selected_card, observations, rewards)
             self._observations = observations
             self._update_observations(next_player, selected_card, observations, rewards)
+            round_number+=1
 
         # Game has finished
         self._game_ended()
@@ -63,6 +65,7 @@ class Game:
         return self._game.scores
 
     def _print_report(self,
+                      round_number: int,
                       player_who_went: int,
                       card_played: Card,
                       observations: Tuple[List[int], ...],
@@ -83,7 +86,7 @@ class Game:
         """
         # TODO: improve printout
         print(
-            f"Player {player_who_went} just played {card_played}. Observations of players: "
+            f"Round {round_number}: Player {player_who_went} just played {card_played}. Observations of players: "
             f"{observations}. Player rewards: {rewards}")
 
     def _game_ended(self):
