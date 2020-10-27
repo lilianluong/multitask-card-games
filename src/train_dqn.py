@@ -15,19 +15,7 @@ def train(save_path):
 
 def eval_filename(load_path):
     model = torch.load(load_path)
-    eval(model)
-
-
-def eval(model):
-    # TODO: test this method
-    results = []
-    with torch.no_grad:
-        for _ in range(10):
-            game = Game(SimpleHearts, [DQNAgent] + [RandomAgent] * 3,
-                        agent_params=[{"model": model}, {}, {}, {}],)
-            result = game.run()
-            results.append(result)
-    return results
+    evaluate_random(DQNAgent, model, num_trials=500)
 
 
 if __name__ == "__main__":
