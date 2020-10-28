@@ -42,6 +42,7 @@ class TrickTakingGame:
 
     def __init__(self):
         self._state = None
+        self._num_cards = sum(self.cards_per_suit)
 
     def reset(self) -> Tuple[List[int], ...]:
         """
@@ -308,7 +309,7 @@ class TrickTakingGame:
         """
         :return: int, the total number of cards in the game based on cards_per_suit()
         """
-        return np.sum(self.cards_per_suit).item()
+        return self._num_cards
 
     @property
     def num_players(self) -> int:
@@ -365,6 +366,7 @@ class TrickTakingGame:
         :param card_index: int, 0 <= card_index < self.num_cards
         :return: Card
         """
+        # TODO: run once in map and lookup in future
         suit, total = 0, 0
         while total + self.cards_per_suit[suit] <= card_index:
             total += self.cards_per_suit[suit]
