@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from agents.base import Learner
 from agents.belief_agent import BeliefBasedAgent
 from environments.hearts import SimpleHearts
+from environments.test_hearts import TestSimpleHearts
 from environments.trick_taking_game import TrickTakingGame
 from evaluators import evaluate_random
 from game import Game
@@ -21,7 +22,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class DQN(nn.Module):
-    def __init__(self, observation_size, action_size, H1=100, H2=80, H3=60, H4=40):
+    def __init__(self, observation_size, action_size, H1=200, H2=160, H3=120, H4=80):
         """
 
         :param observation_size: Size of belief as defined in belief_agent.py
@@ -62,8 +63,7 @@ class DQNAgent(BeliefBasedAgent):
 
     def act(self, epsilon: float = 0):
         if np.random.rand() <= epsilon:
-            valid_cards = self._get_hand(self._current_observation, valid_only=False)
-            return random.sample(valid_cards, 1)[0]
+            return self._game.index_to_card(random.randint(0, self._game.num_cards - 1))
 
         # reformat observation into following format: hand +
         action_values = self.model.forward(torch.FloatTensor(self._belief).to(device))
@@ -80,23 +80,25 @@ class DQNLearner(Learner):
     def __init__(self, resume_state=None):
 
         # calculate parameter sizes
-        constant_game = SimpleHearts()
+        constant_game = TestSimpleHearts()
         cards_per_suit = constant_game.cards_per_suit[0]
         num_cards = constant_game.num_cards
         self.action_size = num_cards
-        self.observation_size = num_cards * 4 + cards_per_suit
-        self.memory = deque(maxlen=100)  # modification to dqn to preserve recent only
-        self.gamma = 0.95  # discount rate
+        self.observation_size = num_cards * 2
+        """ + len(
+            constant_game.cards_per_suit) + constant_game.num_players"""
+        self.memory = deque(maxlen=1000)  # modification to dqn to preserve recent only
+        self.gamma = 0.1  # discount rate
         self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
-        self.epsilon_min = 0.01  # min exploration
+        self.epsilon_min = 0.1  # min exploration
         self.epsilon_decay = 0.995  # to decrease exploration rate over time
         self.learning_rate = 5E-4
 
         # training hyperparams
         self.num_epochs = 5000
-        self.games_per_epoch = 3
-        self.batch_size = 20
-        self.num_batches = 2
+        self.games_per_epoch = 20
+        self.batch_size = 100
+        self.num_batches = 5
 
         # Init agents and trainers
         self.model = DQN(self.observation_size, self.action_size).to(device)
