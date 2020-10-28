@@ -17,7 +17,11 @@ class BeliefBasedAgent(Agent):
         self._last_belief = None
         self._last_action = None
         self._last_reward = None
+        self._running_reward = 0
+        self._running_action = None
         self._belief = None
+        self._player_belief = None
+        self._player_action = None
 
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
         """
@@ -28,9 +32,15 @@ class BeliefBasedAgent(Agent):
         :param reward: an integral reward corresponding to this player as returned by the env
         :return: None
         """
-        self._last_belief = self._belief
-        self._last_action = action
-        self._last_reward = reward
+        if action[0] == self._player:
+            self._last_belief = self._player_belief
+            self._last_action = self._player_action
+            self._last_reward = self._running_reward
+            self._running_reward = 0
+            self._player_belief = self._belief
+            self._player_action = action
+        self._running_action = action
+        self._running_reward += reward if reward else 0
         self._belief = self._update_belief(observation)
 
     def barb(self) -> Union[None, Tuple[List[int], int, int, List[int]]]:
@@ -39,8 +49,11 @@ class BeliefBasedAgent(Agent):
         :return: (old belief, action, reward, new belief) experience if the last action taken was by this agent,
                  else None
         """
-        if self._last_action[0] == self._player:
-            return self._last_belief[:], self._last_action[1], self._last_reward, self._belief[:]
+        if self._running_action[0] == self._player:
+            try:
+                return self._last_belief[:], self._last_action[1], self._last_reward, self._player_belief[:]
+            except TypeError:
+                return None
         return None
 
     @abc.abstractmethod
