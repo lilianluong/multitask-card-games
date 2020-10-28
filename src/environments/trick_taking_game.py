@@ -96,8 +96,13 @@ class TrickTakingGame:
         if not self.is_valid_play(player, card_index):
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
             card_index = random.choice(valid_cards)  # Choose random valid move to play
-            rewards[player] -= 100  # Huge penalty for picking an invalid card!
+            if self._state[card_index] == player:
+                rewards[player] -= 10
+            else:
+                rewards[player] -= 100  # Huge penalty for picking an invalid card!
             # TODO: track invalid plays
+        else:
+            rewards[player] += 20
 
         # Play the card
         self._state[card_index] = -1
