@@ -93,11 +93,12 @@ class TrickTakingGame:
             return self._get_observations(), tuple(rewards), False, {"error": OutOfTurnException}
 
         # Check if the card is a valid play
+        invalid_plays = {}
         if not self.is_valid_play(player, card_index):
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             rewards[player] -= 100  # Huge penalty for picking an invalid card!
-            # TODO: track invalid plays
+            invalid_plays[player] = "invalid"
 
         # Play the card
         self._state[card_index] = -1
@@ -137,7 +138,7 @@ class TrickTakingGame:
         else:
             done = False
 
-        return self._get_observations(), tuple(rewards), done, {}
+        return self._get_observations(), tuple(rewards), done, invalid_plays
 
     def render(self, mode: str = "human", view: int = -1):
         """

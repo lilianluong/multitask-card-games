@@ -21,7 +21,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class DQN(nn.Module):
-    def __init__(self, observation_size, action_size, H1=50, H2=50):
+    def __init__(self, observation_size, action_size, H1=100, H2=80, H3=60, H4=40):
         """
 
         :param observation_size: Size of belief as defined in belief_agent.py
@@ -32,7 +32,9 @@ class DQN(nn.Module):
         super().__init__()
         self.fc1 = torch.nn.Linear(observation_size, H1)
         self.fc2 = torch.nn.Linear(H1, H2)
-        self.fc3 = torch.nn.Linear(H2, action_size)
+        self.fc3 = torch.nn.Linear(H2, H3)
+        self.fc4 = torch.nn.Linear(H3, H4)
+        self.fc5 = torch.nn.Linear(H4, action_size)
 
     def forward(self, observation):
         '''
@@ -40,7 +42,9 @@ class DQN(nn.Module):
         '''
         x = F.relu(self.fc1(observation))
         x = F.relu(self.fc2(x))
-        return self.fc3(x)
+        x = F.relu(self.fc3(x))
+        x = F.relu(self.fc4(x))
+        return self.fc5(x)
 
 
 class DQNAgent(BeliefBasedAgent):
@@ -58,7 +62,7 @@ class DQNAgent(BeliefBasedAgent):
 
     def act(self, epsilon: float = 0):
         if np.random.rand() <= epsilon:
-            valid_cards = self._get_hand(self._current_observation, valid_only=True)
+            valid_cards = self._get_hand(self._current_observation, valid_only=False)
             return random.sample(valid_cards, 1)[0]
 
         # reformat observation into following format: hand +
@@ -73,7 +77,7 @@ class DQNAgent(BeliefBasedAgent):
 
 class DQNLearner(Learner):
 
-    def __init__(self):
+    def __init__(self, resume_state=None):
 
         # calculate parameter sizes
         constant_game = SimpleHearts()
@@ -81,22 +85,23 @@ class DQNLearner(Learner):
         num_cards = constant_game.num_cards
         self.action_size = num_cards
         self.observation_size = num_cards * 4 + cards_per_suit
-        self.epsilon_greedy = 0.05  # percent time to be epsilon greedy
         self.memory = deque(maxlen=100)  # modification to dqn to preserve recent only
         self.gamma = 0.95  # discount rate
-        self.epsilon = 1.0  # exploration rate
+        self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
         self.epsilon_min = 0.01  # min exploration
         self.epsilon_decay = 0.995  # to decrease exploration rate over time
         self.learning_rate = 5E-4
 
         # training hyperparams
-        self.num_epochs = 10000
+        self.num_epochs = 5000
         self.games_per_epoch = 3
         self.batch_size = 20
         self.num_batches = 2
 
         # Init agents and trainers
         self.model = DQN(self.observation_size, self.action_size).to(device)
+        if resume_state is not None:
+            self.model.load_state_dict(resume_state)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         self.evaluate_every = 50  # number of epochs to evaluate between
@@ -129,13 +134,16 @@ class DQNLearner(Learner):
 
                 # evaluate
                 if (epoch + 1) % self.evaluate_every == 0:
-                    winrate, avg_score, scores = evaluate_random(DQNAgent, self.model,
-                                                                 num_trials=25)
+                    winrate, avg_score, invalid_percent, scores = evaluate_random(DQNAgent,
+                                                                                  self.model,
+                                                                                  num_trials=25)
                     self.writer.add_scalar("eval_winrate", winrate, epoch)
                     self.writer.add_scalar("eval_score", avg_score, epoch)
+                    self.writer.add_scalar("invalid_percentage", invalid_percent, epoch)
 
                 if self.epsilon > self.epsilon_min:
                     self.epsilon *= self.epsilon_decay
+                    self.writer.add_scalar("epsilon", self.epsilon, epoch)
 
         return self.model
 
@@ -162,8 +170,8 @@ class DQNLearner(Learner):
         belief, next_belief = torch.from_numpy(belief).type(torch.FloatTensor).to(device), \
                               torch.from_numpy(next_belief).type(torch.FloatTensor).to(device)
         # Linear expects dims batch size x feature size (feat size is observation size here)
-        target = torch.from_numpy(reward).to(device) + self.gamma * torch.argmax(
-            self.model.forward(next_belief), dim=1, keepdim=True)
+        target = torch.from_numpy(reward).to(device) + self.gamma * torch.max(
+            self.model.forward(next_belief), dim=1, keepdim=True)[0]
         pred = self.model.forward(belief)
         pred = torch.gather(pred, 1, torch.from_numpy(action).to(device)).to(
             device)  # convert prediction
