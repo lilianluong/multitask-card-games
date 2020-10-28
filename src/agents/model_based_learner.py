@@ -163,7 +163,7 @@ class ModelBasedLearner(Learner):
         self._batch_size = 100
 
         self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
-        self.epsilon_min = 0.01  # min exploration
+        self.epsilon_min = 0.1  # min exploration
         self.epsilon_decay = 0.995  # to decrease exploration rate over time
 
         self.writer = SummaryWriter(f"runs/dqn-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
