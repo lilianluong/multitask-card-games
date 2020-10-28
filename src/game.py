@@ -49,6 +49,7 @@ class Game:
         self._observations = None
         self._barbs = []
         self._game_params = game_params
+        self._info = []
 
     def run(self) -> List[int]:
         """
@@ -68,6 +69,7 @@ class Game:
             selected_card = self._choose_action(next_player)
             card_index = self._game.card_to_index(selected_card)
             observations, rewards, done, info = self._game.step((next_player, card_index))
+            self._info.append(info)
             if self._game_params.get("verbose", True):
                 self._print_report(round_number, next_player, selected_card, observations, rewards)
             self._observations = observations
@@ -162,3 +164,6 @@ class Game:
 
     def get_barbs(self):
         return self._barbs
+
+    def get_info(self):
+        return self._info

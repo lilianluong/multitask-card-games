@@ -10,11 +10,17 @@ from game import Game
 def evaluate_random(agent_type, model, num_trials=25):
     with torch.no_grad():
         scores = []
+        num_invalid = 0
         for _ in range(num_trials):
-            game = Game(SimpleHearts, [agent_type] + [RandomAgent] * 3, [{"model": model}, {}, {}, {}],
+            game = Game(SimpleHearts, [agent_type] + [RandomAgent] * 3,
+                        [{"model": model}, {}, {}, {}],
                         {"epsilon": 0, "verbose": False})
             score = game.run()
             scores.append(score)
+            infos = game.get_info()
+            for info in infos:
+                if 0 in info and info[0] == "invalid":
+                    num_invalid += 1
 
         record = []
         for score in scores:
@@ -22,4 +28,9 @@ def evaluate_random(agent_type, model, num_trials=25):
         winrate = record.count(True) / len(record)
         avg_score = np.asarray(scores)[:, 0].mean()
 
-        return winrate, avg_score, scores
+        # calculate invalid
+        constant_game = SimpleHearts()
+
+        percent_invalid = num_invalid / (
+                    constant_game.num_cards / constant_game.num_players * num_trials)
+        return winrate, avg_score, percent_invalid, scores
