@@ -129,11 +129,19 @@ class ModelBasedAgent(BeliefBasedAgent):
 
     def act(self, epsilon: float = 0) -> Card:
         if np.random.rand() <= epsilon:
-            valid_cards = self._get_hand(self._current_observation, valid_only=True)
-            return random.sample(valid_cards, 1)[0]
+            return self._game.index_to_card(random.randint(0, self._game.num_cards - 1))
+            # valid_cards = self._get_hand(self._current_observation, valid_only=True)
+            # return random.sample(valid_cards, 1)[0]
 
         # TODO: Select an action
-        raise NotImplementedError
+        inputs = []
+        for a in range(self._game.num_cards):
+            inputs.append(self._belief + [0 for _ in range(self._game.num_cards)])
+            inputs[-1][a] = 1
+        action_values = self._reward_model.forward(torch.FloatTensor(inputs).to(device))
+        chosen_action = torch.argmax(action_values).item()
+        print(chosen_action)
+        return self._game.index_to_card(chosen_action)
 
 
 class ModelBasedLearner(Learner):
@@ -144,11 +152,18 @@ class ModelBasedLearner(Learner):
         if multitask:
             raise NotImplementedError
         self._transition_models = {}
+        self._transition_optimizers = {}
         self._reward_models = {}
+        self._reward_optimizers = {}
 
         # Hyperparameters
-        self._num_epochs = 100000
-        self._games_per_epoch = 3
+        self._num_epochs = 50000
+        self._games_per_epoch = 20
+        self._batch_size = 100
+
+        self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
+        self.epsilon_min = 0.01  # min exploration
+        self.epsilon_decay = 0.995  # to decrease exploration rate over time
 
     def train(self, tasks: List[TrickTakingGame.__class__]):
         for task in tasks:
@@ -156,12 +171,19 @@ class ModelBasedLearner(Learner):
 
     def _train_single_task(self, task: TrickTakingGame.__class__):
         sample_task = task()
-        # TODO: initialize models
-        # self._transition_models[task.name] = TransitionModel()
+        belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(sample_task.cards_per_suit)
+        self._transition_models[task.name] = TransitionModel(belief_size,
+                                                             sample_task.num_cards,
+                                                             sample_task.num_players).to(device)
+        self._reward_models[task.name] = RewardModel(belief_size, sample_task.num_cards).to(device)
+        self._transition_optimizers[task.name] = optim.Adam(self._transition_models[task.name].parameters())
+        self._reward_optimizers[task.name] = optim.Adam(self._reward_models[task.name].parameters())
+
         for epoch_num in range(self._num_epochs):
             experiences = self._agent_evaluation(task)
             self._train_world_models(task, experiences)
             self._train_agent_policy(task)
+            # TODO: evaluate once in a while
 
     def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[Tuple[List[int], int, int, List[int]]]:
         """
@@ -169,8 +191,15 @@ class ModelBasedLearner(Learner):
         :param task: the class of the game to play
         :return: list of (b, a, r, b') experiences
         """
-        game = Game(task, [ModelBasedAgent] * 4)  # TODO: add models as parameters
-        # TODO: port over Patrick's code from DQN
+        barbs = []
+        for game_num in range(self._games_per_epoch):
+            game = Game(task, [ModelBasedAgent] * 4, [{"transition_model": self._transition_models[task.name],
+                                                       "reward_model": self._reward_models[task.name]}
+                                                      for _ in range(task().num_players)],
+                        {"epsilon": self.epsilon, "verbose": False})
+            game.run()  # result = game.run()
+            barbs.extend(game.get_barbs())
+        return barbs
 
     def _train_world_models(self, task: TrickTakingGame.__class__,
                             experiences: List[Tuple[List[int], int, int, List[int]]]):
@@ -180,7 +209,43 @@ class ModelBasedLearner(Learner):
         :param experiences: list of (b, a, r, b') experiences as returned by _agent_evaluation
         :return: None
         """
-        raise NotImplementedError  # TODO: Implement!
+        transition_losses, reward_losses = [], []
+
+        # Construct belief_action input matrices
+        experience_array = np.asarray(experiences, dtype=object)
+        belief_actions = np.pad(np.vstack(experience_array[:, 0]), (0, task().num_cards), 'constant')
+        actions = experience_array[:, 1].astype(np.int)
+        indices = np.arange(len(experiences))
+        belief_actions[indices, actions] = 1
+
+        rewards = experience_array[:, 2].astype(np.float)
+        next_beliefs = np.vstack(experience_array[:, 3])
+
+        # Shuffle data
+        np.random.shuffle(indices)
+        belief_actions = torch.from_numpy(belief_actions[indices]).float().to(device)
+        rewards = torch.from_numpy(rewards[indices]).float().to(device)
+        next_beliefs = torch.from_numpy(next_beliefs[indices]).float().to(device)
+
+        for model_dict, optim_dict, targets, losses in (
+                (self._transition_models, self._transition_optimizers, next_beliefs, transition_losses),
+                (self._reward_models, self._reward_optimizers, rewards, reward_losses)
+        ):
+            model = model_dict[task.name]
+            optimizer = optim_dict[task.name]
+            for i in range(0, len(experiences), self._batch_size):
+                x = belief_actions[i: i + self._batch_size]
+                pred = model.forward(x)
+                loss = model.loss(pred, next_beliefs[i: i + self._batch_size])
+                losses.append(loss)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+        print(np.mean(transition_losses), np.mean(reward_losses))
+
+        # TODO: do something with losses
+        pass
 
     def _train_agent_policy(self, task: TrickTakingGame.__class__):
         """
@@ -188,7 +253,7 @@ class ModelBasedLearner(Learner):
         :param task: the class of the game to train for
         :return: None
         """
-        pass
+        pass  # currently using naive one-step lookahead instead of learned policy via expert iteration
 
     def initialize_agent(self, game: TrickTakingGame, player_number: int) -> Agent:
         return ModelBasedAgent(game, player_number, self._transition_models[game.name], self._reward_models[game.name])
