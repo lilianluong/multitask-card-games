@@ -4,7 +4,7 @@ Model-based Agent-Learner pair.
 
 import random
 from datetime import datetime
-from typing import List, Tuple, Any
+from typing import Dict, List, Tuple, Any
 
 import numpy as np
 import torch
@@ -34,16 +34,24 @@ class TransitionModel(nn.Module):
         :param num_players: number of players in game, used to partition belief for sigmoid and loss
         """
         super().__init__()
-        h1 = 220
-        h2 = 200
-        h3 = 180
+        # h1 = 280
+        # h2 = 240
+        # h3 = 200
+        # h4 = 160
+        h1 = 600
+        h2 = 300
+        h3 = 120
+        d = belief_size + num_actions
+        input_size = d * (d + 1)
         self._num_players = num_players
         self.model = nn.Sequential(
-            nn.Linear(belief_size + num_actions, h1),
+            nn.Linear(input_size, h1),
             nn.ReLU(inplace=True),
             nn.Linear(h1, h2),
             nn.ReLU(inplace=True),
             nn.Linear(h2, h3),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(h3, h4),
             nn.ReLU(inplace=True),
             nn.Linear(h3, belief_size)
         )
@@ -70,6 +78,15 @@ class TransitionModel(nn.Module):
         # TODO: Regularization?
         return bce_loss + mse_loss
 
+    def polynomial(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Return x raised to the second order polynomial basis
+        """
+        n, d = x.shape
+        x1 = torch.unsqueeze(torch.cat([torch.ones((n, 1)).to(device), x], dim=1), 1)
+        x = torch.unsqueeze(x, 2) * x1
+        return x.reshape(n, d * (d + 1))
+
 
 class RewardModel(nn.Module):
     """
@@ -82,16 +99,21 @@ class RewardModel(nn.Module):
         :param num_actions: number of possible actions, to be 1-hot encoded and attached to belief
         """
         super().__init__()
-        h1 = 200
-        h2 = 100
-        h3 = 50
+        h1 = 120
+        h2 = 50
+        h3 = 20
+        # h4 = 20
+        d = belief_size + num_actions
+        input_size = d * (d + 1)
         self.model = nn.Sequential(
-            nn.Linear(belief_size + num_actions, h1),
+            nn.Linear(input_size, h1),
             nn.ReLU(inplace=True),
             nn.Linear(h1, h2),
             nn.ReLU(inplace=True),
             nn.Linear(h2, h3),
             nn.ReLU(inplace=True),
+            # nn.Linear(h3, h4),
+            # nn.ReLU(inplace=True),
             nn.Linear(h3, 1)
         )
 
@@ -113,6 +135,15 @@ class RewardModel(nn.Module):
         mse_loss = nn.MSELoss()(pred, y)
         # TODO: Regularization?
         return mse_loss
+
+    def polynomial(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Return x
+        """
+        n, d = x.shape
+        x1 = torch.unsqueeze(torch.cat([torch.ones((n, 1)).to(device), x], dim=1), 1)
+        x = torch.unsqueeze(x, 2) * x1
+        return x.reshape(n, d * (d + 1))
 
 
 class ModelBasedAgent(BeliefBasedAgent):
@@ -139,14 +170,14 @@ class ModelBasedAgent(BeliefBasedAgent):
         inputs = []
         for a in range(self._game.num_cards):
             inputs.append(self._belief + [0 for _ in range(self._game.num_cards)])
-            inputs[-1][a] = 1
-        action_values = self._reward_model.forward(torch.FloatTensor(inputs).to(device))
+            inputs[-1][len(self._belief) + a] = 1
+        action_values = self._reward_model.forward(self._reward_model.polynomial(torch.FloatTensor(inputs).to(device)))
         chosen_action = torch.argmax(action_values).item()
         return self._game.index_to_card(chosen_action)
 
 
 class ModelBasedLearner(Learner):
-    def __init__(self, multitask: bool = False):
+    def __init__(self, multitask: bool = False, resume_model: Dict = None):
         """
         :param multitask: whether to use multitask learning or not
         """
@@ -157,14 +188,22 @@ class ModelBasedLearner(Learner):
         self._reward_models = {}
         self._reward_optimizers = {}
 
+        if resume_model is not None:
+            for key, item in resume_model["transition"].items():
+                self._transition_models[key] = TransitionModel(*item["params"]).to(device)
+                self._transition_models[key].load_state_dict(item["state"])
+            for key, item in resume_model["reward"].items():
+                self._reward_models[key] = RewardModel(*item["params"]).to(device)
+                self._reward_models[key].load_state_dict(item["state"])
+
         # Hyperparameters
-        self._num_epochs = 50000
+        self._num_epochs = 5000
         self._games_per_epoch = 20
-        self._batch_size = 100
+        self._batch_size = 112
 
         self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
         self.epsilon_min = 0.1  # min exploration
-        self.epsilon_decay = 0.995  # to decrease exploration rate over time
+        self.epsilon_decay = 0.999  # to decrease exploration rate over time
 
         self.writer = SummaryWriter(f"runs/dqn-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
@@ -176,12 +215,14 @@ class ModelBasedLearner(Learner):
     def _train_single_task(self, task: TrickTakingGame.__class__):
         sample_task = task()
         belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(sample_task.cards_per_suit)
-        self._transition_models[task.name] = TransitionModel(belief_size,
-                                                             sample_task.num_cards,
-                                                             sample_task.num_players).to(device)
-        self._reward_models[task.name] = RewardModel(belief_size, sample_task.num_cards).to(device)
+        if task.name not in self._transition_models:
+            self._transition_models[task.name] = TransitionModel(belief_size,
+                                                                 sample_task.num_cards,
+                                                                 sample_task.num_players).to(device)
+        if task.name not in self._reward_models:
+            self._reward_models[task.name] = RewardModel(belief_size, sample_task.num_cards).to(device)
         self._transition_optimizers[task.name] = optim.Adam(self._transition_models[task.name].parameters())
-        self._reward_optimizers[task.name] = optim.Adam(self._reward_models[task.name].parameters())
+        self._reward_optimizers[task.name] = optim.Adam(self._reward_models[task.name].parameters(), lr=1e-4)
 
         for epoch in range(self._num_epochs):
             if epoch % 10 == 0:
@@ -205,6 +246,13 @@ class ModelBasedLearner(Learner):
             if self.epsilon > self.epsilon_min:
                 self.epsilon *= self.epsilon_decay
                 self.writer.add_scalar("epsilon", self.epsilon, epoch)
+
+            if (epoch + 1) % 200 == 0:
+                torch.save(self._transition_models[task.name].state_dict(), "models/transition_model_temp4.pt")
+                torch.save(self._reward_models[task.name].state_dict(), "models/reward_model_temp4.pt")
+
+        torch.save(self._transition_models[task.name].state_dict(), "models/transition_model3.pt")
+        torch.save(self._reward_models[task.name].state_dict(), "models/reward_model3.pt")
 
     def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[Tuple[List[int], int, int, List[int]]]:
         """
@@ -234,10 +282,12 @@ class ModelBasedLearner(Learner):
 
         # Construct belief_action input matrices
         experience_array = np.asarray(experiences, dtype=object)
+        sample_task = task()
+        belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(sample_task.cards_per_suit)
         belief_actions = np.pad(np.vstack(experience_array[:, 0]), (0, task().num_cards), 'constant')
         actions = experience_array[:, 1].astype(np.int)
         indices = np.arange(len(experiences))
-        belief_actions[indices, actions] = 1
+        belief_actions[indices, actions + belief_size] = 1
 
         rewards = np.vstack(experience_array[:, 2])
         next_beliefs = np.vstack(experience_array[:, 3])
@@ -256,6 +306,7 @@ class ModelBasedLearner(Learner):
             optimizer = optim_dict[task.name]
             for i in range(0, len(experiences), self._batch_size):
                 x = belief_actions[i: i + self._batch_size]
+                x = model.polynomial(x)
                 pred = model.forward(x)
                 y = targets[i: i + self._batch_size]
                 loss = model.loss(pred, y)
@@ -276,3 +327,18 @@ class ModelBasedLearner(Learner):
 
     def initialize_agent(self, game: TrickTakingGame, player_number: int) -> Agent:
         return ModelBasedAgent(game, player_number, self._transition_models[game.name], self._reward_models[game.name])
+
+
+if __name__ == "__main__":
+    from environments.test_hearts import TestSimpleHearts
+    from agents.random_agent import RandomAgent
+    transition_state = torch.load("../models/transition_model_temp3.pt")
+    reward_state = torch.load("../models/reward_model_temp3.pt")
+    resume = {"transition": {"Test Simple Hearts": {"state": transition_state, "params": [104, 24, 4]}}, "reward": {"Test Simple Hearts": {"state": reward_state, "params": [104, 24]}}}
+    learner = ModelBasedLearner(resume_model = resume)
+    def get_game():
+        game = Game(TestSimpleHearts, [ModelBasedAgent, RandomAgent, RandomAgent, RandomAgent], [
+            {"transition_model": learner._transition_models["Test Simple Hearts"],
+             "reward_model": learner._reward_models["Test Simple Hearts"]}, {}, {}, {}], {"epsilon": 0, "verbose": False})
+        game.run()
+        return game.get_info()

@@ -10,8 +10,7 @@ from game import Game
 def train(save_path):
     # old_model_state_dict = torch.load("5000.pt")
     learner = ModelBasedLearner()#resume_state=old_model_state_dict)
-    trained_model = learner.train([TestSimpleHearts])
-    torch.save(trained_model.state_dict(), save_path)
+    learner.train([TestSimpleHearts])
 
 
 def eval_filename(load_path):

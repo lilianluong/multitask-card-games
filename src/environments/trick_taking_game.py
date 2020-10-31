@@ -41,6 +41,7 @@ class TrickTakingGame:
     name = "Trick Taking Game"
 
     def __init__(self):
+        self._num_cards = sum(self.cards_per_suit)
         self._state = None
 
     def reset(self) -> Tuple[List[int], ...]:
@@ -308,7 +309,7 @@ class TrickTakingGame:
         """
         :return: int, the total number of cards in the game based on cards_per_suit()
         """
-        return np.sum(self.cards_per_suit).item()
+        return self._num_cards
 
     @property
     def num_players(self) -> int:

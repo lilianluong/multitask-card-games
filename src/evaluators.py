@@ -16,6 +16,7 @@ def evaluate_random(agent_type, models, num_trials=25):
                         [{"transition_model": models[0], "reward_model": models[1]}, {}, {}, {}],
                         # [{"model": model}, {}, {}, {}],
                         {"epsilon": 0, "verbose": False})
+            # game = Game(TestSimpleHearts, [RandomAgent] * 4, [{}] * 4, {"epsilon": 0, "verbose": False})
             score = game.run()
             scores.append(score)
             infos = game.get_info()
@@ -36,3 +37,7 @@ def evaluate_random(agent_type, models, num_trials=25):
                     constant_game.num_cards / constant_game.num_players * num_trials)
         print(percent_invalid, num_invalid)
         return winrate, avg_score, percent_invalid, scores
+
+
+if __name__ == "__main__":
+    print(evaluate_random(None, None, 1000))
