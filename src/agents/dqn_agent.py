@@ -111,7 +111,7 @@ class DQNLearner(Learner):
         self.learning_rate = 5E-4
 
         # training hyperparams
-        self.num_epochs = 300
+        self.num_epochs = 5000
         self.games_per_epoch = 100
         self.batch_size = 1000
         self.num_batches = 5
@@ -124,6 +124,8 @@ class DQNLearner(Learner):
 
         self.evaluate_every = 50  # number of epochs to evaluate between
         self.step = 0
+        self.save_every = 1001  # save model every x iterations
+        self.save_base_path = "saved_models/agent"
 
         self.writer = SummaryWriter(f"runs/dqn {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
         # TODO: add network graph to tensborboard
@@ -167,6 +169,10 @@ class DQNLearner(Learner):
                 if self.epsilon > self.epsilon_min:
                     self.epsilon *= self.epsilon_decay
                     self.writer.add_scalar("epsilon", self.epsilon, epoch)
+
+                if (epoch+1) % self.save_every == 0:
+                    # save model
+                    torch.save(self.model.state_dict(), f"{self.save_base_path}_{epoch}.pt")
 
         return self.model
 

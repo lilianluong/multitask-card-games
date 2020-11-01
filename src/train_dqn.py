@@ -10,7 +10,7 @@ from game import Game
 
 
 def train(save_path):
-    #old_model_state_dict = torch.load("5000.pt")
+    # old_model_state_dict = torch.load("saved_model.pt")
     # learner = DQNLearner(resume_state=old_model_state_dict)
     learner = DQNLearner()
     trained_model = learner.train([TestSimpleHearts])
