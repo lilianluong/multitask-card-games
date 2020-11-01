@@ -24,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class DQN(nn.Module):
-    def __init__(self, observation_size, action_size, H1=100, H2=80, H3=60, H4=30):
+    def __init__(self, observation_size, action_size, H1=200, H2=160, H3=120, H4=60):
         """
 
         :param observation_size: Size of belief as defined in belief_agent.py
@@ -134,7 +134,7 @@ class DQNLearner(Learner):
 
     def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
         num_cpus = multiprocessing.cpu_count()
-        num_threads = int(num_cpus / 2)  # can use more or less CPUs
+        num_threads = int(num_cpus * 3/4)  # can use more or less CPUs
         executor = futures.ProcessPoolExecutor(max_workers=num_threads)
         for task in tasks:
             for epoch in range(self.num_epochs):

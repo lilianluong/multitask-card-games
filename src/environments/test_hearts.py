@@ -40,4 +40,4 @@ class TestSimpleHearts(TrickTakingGame):
 
     @property
     def cards_per_suit(self) -> Tuple[int, ...]:
-        return 3, 3, 3, 3
+        return 6, 6, 6, 6
