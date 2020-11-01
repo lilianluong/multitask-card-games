@@ -104,7 +104,8 @@ class TrickTakingGame:
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             invalid_plays[player] = "invalid"
         else:
-            rewards[player] += 100
+            pass
+            # possible to reward player for making good choice here
 
         # Play the card
         self._state[card_index] = -1
