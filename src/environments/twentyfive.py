@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List, Tuple, Union
 
 from environments.trick_taking_game import TrickTakingGame
@@ -79,7 +80,7 @@ class TwentyFive(TrickTakingGame):
 			self._state[-2] = -1
 			self._state[-1] = next_leader
 			card_distribution = self._deal() #for now, assuming that we'll have to deal every time -- 20 cards needed and 32 - 20 < 20
-			self.state += (card_distribution + [0]*(len(self.state) - len(card_distribution)))
+			self._state += (card_distribution + [0]*(len(self._state) - len(card_distribution)))
 
 
 		# Check if game ended
@@ -91,8 +92,8 @@ class TwentyFive(TrickTakingGame):
 			for i in range(num_players):
 				offset = num_cards + num_players
 				self._state[offset + i] += bonus_rewards[i]
-			else:
-				done = False
+		else:
+			done = False
 
 		return self._get_observations(), tuple(rewards), done, invalid_plays
 
@@ -103,6 +104,7 @@ class TwentyFive(TrickTakingGame):
 		cards = []
 		for i in range(self.num_players):
 			cards += [i for _ in range(5)] #revisit, is 5 the best number for a reduced deck?
+		cards += [-1]*(self.num_cards - len(cards))
 		random.shuffle(cards)
 		return cards
 
@@ -143,20 +145,20 @@ class TwentyFive(TrickTakingGame):
 				winning_card = card
 				if card.suit == trump_suit or card == Card(Suit.HEARTS, self._num_cards-1):
 					trump_played = True 
-
 		return winning_index, winning_card
 
 	def _game_has_ended(self) -> bool:
-		scores = self.scores()
-		return max(scores) == 25
+		return max(self.scores) == 25
 
 	def is_valid_play(self, player_index, card_index) -> bool:
+		
 		if self._state[card_index] != player_index:
 			return False
 
 		# Check if player is empty of the starting suit if different suit was played
 		played_card = self.index_to_card(card_index)
 		starting_card = self.trick_leader
+
 		if starting_card is None:
 			return True
 		if played_card.suit != starting_card.suit and played_card.suit != self.trump_suit:

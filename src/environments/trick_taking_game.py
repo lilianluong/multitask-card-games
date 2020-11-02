@@ -64,6 +64,7 @@ class TrickTakingGame:
                 [0 for _ in range(self.num_players)] +
                 [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
         )
+
         assert len(
             self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
