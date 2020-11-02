@@ -15,7 +15,7 @@ class TestSimpleHearts(TrickTakingGame):
 
     The rules for passing cards do not apply in this variant, for simplicity.
     """
-    name = "Simple Hearts"
+    name = "Test Simple Hearts"
 
     def _get_trump_suit(self) -> int:
         return -1
