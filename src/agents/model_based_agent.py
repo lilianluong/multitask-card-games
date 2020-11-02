@@ -14,6 +14,8 @@ from util import Card
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+action_tensor_cache = {}
+
 
 class ModelBasedAgent(BeliefBasedAgent):
     def __init__(self, game: TrickTakingGame,
@@ -24,6 +26,8 @@ class ModelBasedAgent(BeliefBasedAgent):
         self._transition_model = transition_model
         self._reward_model = reward_model
         self._current_observation = None
+        if self._game.num_cards not in action_tensor_cache:
+            action_tensor_cache[self._game.num_cards] = torch.eye(self._game.num_cards).to(device)
 
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
         super().observe(action, observation, reward)
@@ -39,7 +43,6 @@ class ModelBasedAgent(BeliefBasedAgent):
         horizon = 1
         inverse_discount = 1.1
         actions = self._game.num_cards
-        belief_size = len(self._belief)
         nodes = deque()
         nodes.append((torch.FloatTensor([self._belief]).to(device), None, 0, 0))  # belief, first_action, reward, steps
         best_first_action = 0
@@ -47,14 +50,15 @@ class ModelBasedAgent(BeliefBasedAgent):
         while len(nodes):
             belief, first_action, reward, steps = nodes.popleft()
             if steps == horizon: break
-            x = torch.cat([belief.repeat(actions, 1), torch.zeros((actions, actions)).to(device)], dim=1)
-            x[torch.arange(actions), torch.arange(actions) + belief_size] = 1
+            x = torch.cat([belief.repeat(actions, 1), action_tensor_cache[actions]], dim=1)
             action_values = self._reward_model.forward(
                 self._reward_model.polynomial(x)
             )
-            next_beliefs = self._transition_model.forward(
-                self._transition_model.polynomial(x)
-            )
+            next_beliefs = None
+            if steps < horizon - 1:
+                next_beliefs = self._transition_model.forward(
+                    self._transition_model.polynomial(x)
+                )
             for i in range(actions):
                 new_reward = inverse_discount * reward + action_values[i].item()
                 if steps < horizon - 1:

@@ -19,7 +19,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class ModelBasedLearner(Learner):
     def __init__(self,
-                 agent: ModelBasedAgent.__class__ = MonteCarloAgent,
+                 agent: ModelBasedAgent.__class__ = ModelBasedAgent,
                  multitask: bool = False,
                  resume_model: Dict[str, Dict[str, Dict[str, Any]]] = None,
                  model_names: Dict[str, str] = None):
@@ -67,18 +67,24 @@ class ModelBasedLearner(Learner):
             self._setup_single_task(task)
 
         for epoch in range(self._num_epochs):
-            print("EPOCH", epoch)
+            transition_losses, reward_losses = [], []
             for task in tasks:
-                self._train_single_task(task, epoch)
+                transition_loss, reward_loss = self._train_single_task(task, epoch)
+                transition_losses.append(transition_loss)
+                reward_losses.append(reward_loss)
+
+            self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_losses), epoch)
+            self.writer.add_scalar("avg_training_reward_loss", np.mean(reward_losses), epoch)
 
             if epoch % self.evaluate_every == 0:
-                winrate, avg_score, invalid, scores = evaluate_random(tasks,
-                                                                      self._agent_type,
-                                                                      {task.name: self.get_models(task)
-                                                                       for task in tasks},
-                                                                      num_trials=50,
-                                                                      compare_agent=None)  # MonteCarloAgent)
+                winrate, matchrate, avg_score, invalid, scores = evaluate_random(tasks,
+                                                                                 self._agent_type,
+                                                                                 {task.name: self.get_models(task)
+                                                                                  for task in tasks},
+                                                                                 num_trials=50,
+                                                                                 compare_agent=None)  # MonteCarloAgent)
                 self.writer.add_scalar("eval_winrate", winrate, epoch)
+                self.writer.add_scalar("eval_matchrate", matchrate, epoch)
                 self.writer.add_scalar("eval_score_margin", avg_score, epoch)
                 self.writer.add_scalar("invalid_percentage", invalid, epoch)
 
@@ -109,12 +115,12 @@ class ModelBasedLearner(Learner):
         self._transition_optimizers[task.name] = optim.Adam(self._transition_models[task.name].parameters())
         self._reward_optimizers[task.name] = optim.Adam(self._reward_models[task.name].parameters(), lr=1e-4)
 
-    def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int):
+    def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Train a task for a single epoch, following the single-task learning framework
         :param task: class of task to train
         :param epoch: the index of the current epoch
-        :return: None
+        :return: (average transition loss, average reward loss)
         """
         if epoch % 10 == 0:
             print(f"Starting epoch {epoch}/{self._num_epochs} for {task.name}")
@@ -123,14 +129,13 @@ class ModelBasedLearner(Learner):
         transition_loss, reward_loss = self._train_world_models(task, experiences)
         self._train_agent_policy(task)
 
-        self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_loss), epoch)
-        self.writer.add_scalar("avg_training_reward_loss", np.mean(reward_loss), epoch)
-
         if (epoch + 1) % 200 == 0:
             torch.save(self._transition_models[task.name].state_dict(),
                        "models/transition_model_temp_{}.pt".format(self._model_names[task.name]))
             torch.save(self._reward_models[task.name].state_dict(),
                        "models/reward_model_temp_{}.pt".format(self._model_names[task.name]))
+
+        return np.mean(transition_loss), np.mean(reward_loss)
 
     def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[Tuple[List[int], int, int, List[int]]]:
         """

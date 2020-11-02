@@ -15,7 +15,8 @@ def evaluate_random(tasks, agent_type, models, num_trials=50, compare_agent=None
     :param num_trials: int, number of trial games to run per task
     :param compare_agent: optional other agent to compare agent_type to, default will use a random agent
     :return: (win_rate, avg_score, percent_invalid, scores)
-        win_rate: percentage of time agent_type scores at least as well as compare_agent would on the same initial deal
+        win_rate: percentage of time agent_type scores strictly better than compare_agent would on the same initial deal
+        match_rate: percentage of time agent_type scores at least as well
         avg_score: average score that agent_type beats compare_agent by on the same initial deal
         percent_invalid: percentage of time agent_type plays an invalid card
         scores: list of score vectors
@@ -36,6 +37,7 @@ def evaluate_random(tasks, agent_type, models, num_trials=50, compare_agent=None
                             # [{"model": model}, {}, {}, {}],
                             {"epsilon": 0, "verbose": False})
                 score, state = game.run()
+                infos = game.get_info()
                 scores.append(score)
 
                 # Evaluate current agent on same starting state
@@ -50,21 +52,26 @@ def evaluate_random(tasks, agent_type, models, num_trials=50, compare_agent=None
                 random_score, _ = game.run(state)
                 random_scores.append(random_score)
 
-                infos = game.get_info()
                 for info in infos:
                     if 0 in info and info[0] == "invalid":
                         num_invalid += 1
             constant_game = task()
             total_cards_played += constant_game.num_cards / constant_game.num_players * num_trials
 
-        record = []
+        wins = 0
+        matches = 0
         for i, score in enumerate(scores):
-            record.append(True if score[0] >= random_scores[i][0] else False)
+            if score[0] > random_scores[i][0]:
+                wins += 1
+                matches += 1
+            elif score[0] >= random_scores[i][0]:
+                matches += 1
             # record.append(True if np.argmax(score) == 0 else False)
-        winrate = record.count(True) / len(record)
+        winrate = wins / len(scores)
+        matchrate = matches / len(scores)
         avg_score_margin = (np.asarray(scores)[:, 0] - np.asarray(random_scores)[:, 0]).mean()
 
         # calculate invalid
         percent_invalid = num_invalid / total_cards_played
 
-        return winrate, avg_score_margin, percent_invalid, scores
+        return winrate, matchrate, avg_score_margin, percent_invalid, scores

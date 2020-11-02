@@ -16,8 +16,8 @@ class TransitionModel(nn.Module):
         :param num_players: number of players in game, used to partition belief for sigmoid and loss
         """
         super().__init__()
-        h1, h2, h3 = 1200, 600, 220
-        # h1, h2, h3 = 800, 400, 220
+        # h1, h2, h3 = 1200, 600, 220
+        h1, h2, h3 = 800, 400, 220
         d = belief_size + num_actions
         input_size = d * (d + 1)
         self._num_players = num_players
@@ -77,9 +77,8 @@ class RewardModel(nn.Module):
         :param num_actions: number of possible actions, to be 1-hot encoded and attached to belief
         """
         super().__init__()
-        h1 = 200
-        h2 = 40
-        # h1, h2 = 100, 20
+        # h1, h2 = 200, 40
+        h1, h2 = 100, 20
         d = belief_size + num_actions
         input_size = d * (d + 1)
         self.model = nn.Sequential(
