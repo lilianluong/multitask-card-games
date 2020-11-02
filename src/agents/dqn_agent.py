@@ -91,16 +91,17 @@ class GameRunner:
         return barbs
 
 
+def calculate_action_observation_size(game):
+    # calculate parameter sizes
+    constant_game = game()
+    cards_per_suit = constant_game.cards_per_suit[0]
+    num_cards = constant_game.num_cards
+    return num_cards, num_cards*2
+
 class DQNLearner(Learner):
 
     def __init__(self, resume_state=None):
-
-        # calculate parameter sizes
-        constant_game = TestSimpleHearts()
-        cards_per_suit = constant_game.cards_per_suit[0]
-        num_cards = constant_game.num_cards
-        self.action_size = num_cards
-        self.observation_size = num_cards * 2
+        self.action_size, self.observation_size = calculate_action_observation_size(TestSimpleHearts)
         """ + len(
             constant_game.cards_per_suit) + constant_game.num_players"""
         self.memory = deque(maxlen=4000)  # modification to dqn to preserve recent only
