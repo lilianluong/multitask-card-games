@@ -132,7 +132,7 @@ class TrickTakingGame:
             self._state[-1] = next_leader
 
         # Check if game ended
-        if sum(self._state[:num_cards]) == -num_cards:
+        if self._game_has_ended():
             done = True
             # apply score bonuses
             bonus_rewards = self._end_game_bonuses()
@@ -233,6 +233,12 @@ class TrickTakingGame:
         rewards = [0 for _ in range(self.num_players)]
         rewards[winning_player] = 1
         return rewards, winning_player
+
+    def _game_has_ended(self) -> bool:
+        """
+        :return: True if the game has ended
+        """
+        return sum(self._state[:self.num_cards]) == -self.num_cards
 
     def _get_trick_winner(self) -> Tuple[int, Card]:
         """
