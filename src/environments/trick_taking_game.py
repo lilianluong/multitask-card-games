@@ -44,7 +44,7 @@ class TrickTakingGame:
         self._num_cards = sum(self.cards_per_suit)
         self._state = None
 
-    def reset(self) -> Tuple[List[int], ...]:
+    def reset(self, state: List[int] = None) -> Tuple[List[int], ...]:
         """
         Reset the state for a new game, and return initial observations.
 
@@ -55,15 +55,19 @@ class TrickTakingGame:
             [score of player j | 0 <= j < self.num_players] +
             [trump suit number or -1, trick leading card index or -1, index of player to move next]
 
+        :param state: the state to force the game to start at
         :return: Tuple[List[int], ...] of observations
         """
-        card_distribution = self._deal()
-        self._state = (
-                card_distribution +
-                [-1 for _ in range(self.num_players)] +
-                [0 for _ in range(self.num_players)] +
-                [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
-        )
+        if state is None:
+            card_distribution = self._deal()
+            self._state = (
+                    card_distribution +
+                    [-1 for _ in range(self.num_players)] +
+                    [0 for _ in range(self.num_players)] +
+                    [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
+            )
+        else:
+            self._state = state
         assert len(
             self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
@@ -100,7 +104,7 @@ class TrickTakingGame:
             # if self._state[card_index] == player:
             #     rewards[player] -= 10
             # else:
-            rewards[player] -= 20  # Huge penalty for picking an invalid card!
+            rewards[player] -= 50  # Huge penalty for picking an invalid card!
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             invalid_plays[player] = "invalid"
         # else:
@@ -121,7 +125,8 @@ class TrickTakingGame:
         if -1 not in played_cards:
             # Handle rewards
             trick_rewards, next_leader = self._end_trick()
-            rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
+            total_rewards = sum(trick_rewards)
+            rewards = [rewards[i] + 1.3 * trick_rewards[i] - 0.3 * total_rewards for i in range(num_players)]
             for i in range(num_players):
                 offset = num_cards + num_players  # index into state correctly
                 self._state[offset + i] += trick_rewards[i]  # update current scores

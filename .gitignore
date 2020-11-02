@@ -134,6 +134,7 @@ dmypy.json
 
 # tensorboard
 src/runs/
+src/models/
 
 # saved models
 *.pt
