@@ -43,6 +43,7 @@ class TrickTakingGame:
     def __init__(self):
         self._num_cards = sum(self.cards_per_suit)
         self._state = None
+        self._index_card_map = None
 
     def reset(self, state: List[int] = None) -> Tuple[List[int], ...]:
         """
@@ -71,7 +72,10 @@ class TrickTakingGame:
         assert len(
             self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
+        self._index_card_map = self._compute_index_card_map()
         return self._get_observations()
+
+
 
     def step(self, action: Tuple[int, int]) -> Tuple[
         Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
@@ -164,6 +168,19 @@ class TrickTakingGame:
             print(self._state)
         else:
             print(self._get_observations()[view])
+
+    def _compute_index_card_map(self):
+        index_map = {}
+        for card_index in range(self.num_cards):
+            suit, total = 0, 0
+            while total + self.cards_per_suit[suit] <= card_index:
+                total += self.cards_per_suit[suit]
+                suit += 1
+            num = card_index - total
+            assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
+            index_map[card_index]=Card(suit=Suit(suit), value=num)
+        return index_map
+
 
     def _deal(self) -> List[int]:
         """
@@ -371,13 +388,8 @@ class TrickTakingGame:
         :param card_index: int, 0 <= card_index < self.num_cards
         :return: Card
         """
-        suit, total = 0, 0
-        while total + self.cards_per_suit[suit] <= card_index:
-            total += self.cards_per_suit[suit]
-            suit += 1
-        num = card_index - total
-        assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
-        return Card(suit=Suit(suit), value=num)
+        return self._index_card_map[card_index]
+
 
     def card_to_index(self, card: Card) -> int:
         """

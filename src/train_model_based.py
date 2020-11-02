@@ -1,6 +1,6 @@
 import torch
 
-from agents.model_based_learner import ModelBasedLearner, ModelBasedAgent, MonteCarloAgent
+from agents.model_based_learner import ModelBasedLearner, ModelBasedAgent
 from agents.random_agent import RandomAgent
 from environments.test_hearts import TestSimpleHearts
 from environments.trick_taking_game import TrickTakingGame
