@@ -42,6 +42,7 @@ class TrickTakingGame:
 
     def __init__(self):
         self._state = None
+        self._num_cards = sum(self.cards_per_suit)
 
     def reset(self) -> Tuple[List[int], ...]:
         """
@@ -96,14 +97,15 @@ class TrickTakingGame:
         invalid_plays = {}
         if not self.is_valid_play(player, card_index):
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
-            card_index = random.choice(valid_cards)  # Choose random valid move to play
             if self._state[card_index] == player:
                 rewards[player] -= 10
             else:
                 rewards[player] -= 100  # Huge penalty for picking an invalid card!
+            card_index = random.choice(valid_cards)  # Choose random valid move to play
             invalid_plays[player] = "invalid"
         else:
-            rewards[player] += 20
+            pass
+            # possible to reward player for making good choice here
 
         # Play the card
         self._state[card_index] = -1
@@ -314,7 +316,7 @@ class TrickTakingGame:
         """
         :return: int, the total number of cards in the game based on cards_per_suit()
         """
-        return np.sum(self.cards_per_suit).item()
+        return self._num_cards
 
     @property
     def num_players(self) -> int:
@@ -371,6 +373,7 @@ class TrickTakingGame:
         :param card_index: int, 0 <= card_index < self.num_cards
         :return: Card
         """
+        # TODO: run once in map and lookup in future
         suit, total = 0, 0
         while total + self.cards_per_suit[suit] <= card_index:
             total += self.cards_per_suit[suit]
