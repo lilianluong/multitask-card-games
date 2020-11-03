@@ -28,12 +28,13 @@ def train(tasks, load_model_names, save_model_names):
         resume = None
     learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names, resume_model=resume)
 
-    # # Evaluate
-    # evaluate = evaluate_random(tasks,
-    #                            ModelBasedAgent,
-    #                            {task.name: learner.get_models(task) for task in tasks},
-    #                            num_trials=100)
-    # print(evaluate)
+    # Evaluate
+    # for task in tasks:
+    #     evaluate = evaluate_random([task],
+    #                                ModelBasedAgent,
+    #                                {task.name: learner.get_models(task)},
+    #                                num_trials=500)
+    #     print(task.name, ":", evaluate)
 
     learner.train(tasks)
 
@@ -41,5 +42,6 @@ def train(tasks, load_model_names, save_model_names):
 if __name__ == "__main__":
     train([TestSimpleHearts, TrickTakingGame],
           None,
-          {"Test Simple Hearts": "6card_killbot_1", "Trick Taking Game": "ttg_killbot_1"}
+          # {"Test Simple Hearts": "6card_killbot_1", "Trick Taking Game": "ttg_killbot_1"},
+          {"Test Simple Hearts": "6card_killbot_2", "Trick Taking Game": "ttg_killbot_2"}
           )
