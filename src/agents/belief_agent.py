@@ -81,26 +81,26 @@ class BeliefBasedAgent(Agent):
         # + cards in play (BINARY) [maybe 1-HOT instead? but more variables]
         # + trick leader (1-HOT or all zeros) + trump suit (1-HOT)
         # + score (LINEAR)
-        belief = [0 for _ in range(num_cards * 2)]
+        belief = [0 for _ in range(num_cards * 4 + len(self._game.cards_per_suit))]
 
         # Cards in hand / discarded
         for card_index in range(num_cards):
             if observation[card_index] == 1:
                 belief[card_index] = 1
-            # elif observation[card_index] == -1:
-            #     belief[num_cards + card_index] = 1
+            elif observation[card_index] == -1:
+                belief[num_cards + card_index] = 1
         # Cards in play
-        # for card_index in observation[num_cards: num_cards + num_players]:
-        #     if card_index != -1:
-        #         belief[2 * num_cards + card_index] = 1
+        for card_index in observation[num_cards: num_cards + num_players]:
+            if card_index != -1:
+                belief[2 * num_cards + card_index] = 1
         # Trick leader
         if observation[-2] != -1:
             belief[num_cards + observation[-2]] = 1
         # Trump suit
-        # if observation[-3] != -1:
-        #     belief[4 * num_cards + observation[-3]] = 1
+        if observation[-3] != -1:
+            belief[4 * num_cards + observation[-3]] = 1
         # Scores
-        # belief.extend(observation[num_cards + num_players: num_cards + 2 * num_players])
+        belief.extend(observation[num_cards + num_players: num_cards + 2 * num_players])
         return belief
 
     def _get_hand(self, observation: List[int], valid_only: bool = False) -> Set[Card]:
