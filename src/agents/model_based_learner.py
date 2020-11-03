@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import torch
 import torch.optim as optim
-from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from agents.base import Learner
-from agents.model_based_agent import ModelBasedAgent, MonteCarloAgent
-from agents.model_based_models import RewardModel, TransitionModel
+from agents.model_based_agent import ModelBasedAgent
+from agents.models.model_based_models import RewardModel, TransitionModel
+from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
 from environments.trick_taking_game import TrickTakingGame
 from evaluators import evaluate_random
 from game import Game
@@ -32,13 +32,15 @@ class ModelBasedLearner(Learner):
                                     "params": list of parameters to pass into model constructor
         :param model_names: maps task names to names to save model as
         """
-        if multitask:
-            raise NotImplementedError
         self._agent_type = agent
         self._model_names = model_names
-        self._transition_model = TransitionModel().to(device)
+        if multitask:
+            self._transition_model = MultitaskTransitionModel().to(device)
+            self._reward_model = MultitaskRewardModel().to(device)
+        else:
+            self._transition_model = TransitionModel().to(device)
+            self._reward_model = RewardModel().to(device)
         self._transition_optimizer = None
-        self._reward_model = RewardModel().to(device)
         self._reward_optimizer = None
 
         # Load existing

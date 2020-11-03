@@ -2,13 +2,14 @@ import math
 import random
 import time
 from collections import deque, defaultdict
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
 import numpy as np
 import torch
 
 from agents.belief_agent import BeliefBasedAgent
-from agents.model_based_models import RewardModel, TransitionModel
+from agents.models.model_based_models import RewardModel, TransitionModel
+from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
 
@@ -20,8 +21,8 @@ action_tensor_cache = {}
 class ModelBasedAgent(BeliefBasedAgent):
     def __init__(self, game: TrickTakingGame,
                  player_number: int,
-                 transition_model: TransitionModel,
-                 reward_model: RewardModel):
+                 transition_model: Union[TransitionModel, MultitaskTransitionModel],
+                 reward_model: Union[RewardModel, MultitaskRewardModel]):
         super().__init__(game, player_number)
         self._task_name = game.name
         self._transition_model = transition_model
@@ -73,8 +74,8 @@ class ModelBasedAgent(BeliefBasedAgent):
 class MonteCarloAgent(ModelBasedAgent):
     def __init__(self, game: TrickTakingGame,
                  player_number: int,
-                 transition_model: TransitionModel,
-                 reward_model: RewardModel,
+                 transition_model: Union[TransitionModel, MultitaskTransitionModel],
+                 reward_model: Union[RewardModel, MultitaskRewardModel],
                  timeout: float = 0.5,
                  horizon: int = 4,
                  inverse_discount = 1.2):
