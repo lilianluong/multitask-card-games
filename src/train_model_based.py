@@ -22,8 +22,8 @@ def train(tasks, load_model_names, save_model_names):
         for task in tasks:
             transition_state = torch.load("models/transition_model_temp_{}.pt".format(load_model_names[task.name]))
             reward_state = torch.load("models/reward_model_temp_{}.pt".format(load_model_names[task.name]))
-            resume["transition"][task.name] = {"state": transition_state, "params": MODEL_PARAMS[task.name]}
-            resume["reward"][task.name] = {"state": reward_state, "params": MODEL_PARAMS[task.name][:-1]}
+            resume["transition"][task.name] = {"state": transition_state, "task": task}
+            resume["reward"][task.name] = {"state": reward_state, "task": task}
     else:
         resume = None
     learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names, resume_model=resume)
@@ -41,5 +41,5 @@ def train(tasks, load_model_names, save_model_names):
 if __name__ == "__main__":
     train([TestSimpleHearts, TrickTakingGame],
           None,
-          {"Test Simple Hearts": "6card_killbot_1", "Trick Taking Game": "ttg_killbot_1"}
+          {"Test Simple Hearts": "multitask_single_tsh", "Trick Taking Game": "multitask_single_test_ttg"}
           )

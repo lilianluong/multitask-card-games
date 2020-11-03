@@ -23,6 +23,7 @@ class ModelBasedAgent(BeliefBasedAgent):
                  transition_model: TransitionModel,
                  reward_model: RewardModel):
         super().__init__(game, player_number)
+        self._task_name = game.name
         self._transition_model = transition_model
         self._reward_model = reward_model
         self._current_observation = None
@@ -51,14 +52,10 @@ class ModelBasedAgent(BeliefBasedAgent):
             belief, first_action, reward, steps = nodes.popleft()
             if steps == horizon: break
             x = torch.cat([belief.repeat(actions, 1), action_tensor_cache[actions]], dim=1)
-            action_values = self._reward_model.forward(
-                self._reward_model.polynomial(x)
-            )
+            action_values = self._reward_model.forward(x, self._task_name)
             next_beliefs = None
             if steps < horizon - 1:
-                next_beliefs = self._transition_model.forward(
-                    self._transition_model.polynomial(x)
-                )
+                next_beliefs = self._transition_model.forward(x, self._task_name)
             for i in range(actions):
                 new_reward = inverse_discount * reward + action_values[i].item()
                 if steps < horizon - 1:
@@ -103,10 +100,10 @@ class MonteCarloAgent(ModelBasedAgent):
             else:
                 a = current[-1]
                 ba = torch.cat([nodes[current[:-1]], actions[a:a + 1]], dim=1)
-                belief = self._transition_model.forward(self._transition_model.polynomial(ba))
+                belief = self._transition_model.forward(ba, self._task_name)
                 nodes[current] = belief
             belief_action = torch.cat([belief, actions[selected_action:selected_action + 1]], dim=1)
-            reward = self._reward_model.forward(self._reward_model.polynomial(belief_action))
+            reward = self._reward_model.forward(belief_action, self._task_name)
             reward_cache[new_node] = reward
         return reward
 

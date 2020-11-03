@@ -1,5 +1,10 @@
+from typing import List
+
 import torch
 from torch import nn
+
+from environments.trick_taking_game import TrickTakingGame
+from util import polynomial_transform
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -8,36 +13,84 @@ class TransitionModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> b'
     """
-
-    def __init__(self, belief_size: int, num_actions: int, num_players: int):
+    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = True):
         """
-        :param belief_size: number of values in a belief
-        :param num_actions: number of possible actions, to be 1-hot encoded and attached to belief
-        :param num_players: number of players in game, used to partition belief for sigmoid and loss
+        :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
+        :param polynomial: whether or not to use the polynomial basis
         """
         super().__init__()
-        # h1, h2, h3 = 1200, 600, 220
-        h1, h2, h3 = 800, 400, 220
-        d = belief_size + num_actions
-        input_size = d * (d + 1)
-        self._num_players = num_players
-        self.model = nn.Sequential(
-            nn.Linear(input_size, h1),
-            nn.ReLU(inplace=True),
-            nn.Linear(h1, h2),
-            nn.ReLU(inplace=True),
-            nn.Linear(h2, h3),
-            nn.ReLU(inplace=True),
-            nn.Linear(h3, belief_size)
-        )
 
-    def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        if layer_sizes is None:
+            # Default layer sizes
+            layer_sizes = [800, 400, 220]
+            # layer_sizes = [1200, 600, 220]
+        self._layer_sizes = layer_sizes
+
+        self._polynomial = polynomial
+        self._input_size = None
+        self._belief_size = None
+        self._num_players = None
+        self._parameters_returned = False
+        self.models = {}
+
+    def set_task_parameters(self, task_instance: TrickTakingGame):
+        """
+        Set parameters for task
+        :param task_instance: instance of task to sample parameters from
+        :return: None
+        """
+        num_actions = task_instance.num_cards
+        num_players = task_instance.num_players
+        belief_size = 4 * num_actions + num_players + len(task_instance.cards_per_suit)
+        d = belief_size + num_actions
+        self._input_size = d * (d + 1) if self._polynomial else d
+        self._belief_size = belief_size
+        self._num_players = num_players
+
+    def get_parameters(self) -> List:
+        """
+        :return: list of the parameters of all the models for use by an optimizer
+        """
+        self._parameters_returned = True
+        params = []
+        for model in self.models.values():
+            params.extend(list(model.parameters()))
+        return params
+
+    def make_model(self, task: TrickTakingGame.__class__):
+        """
+        Creates a model for a task.
+        :param task: class of the task for which a model should be created
+        :returns: None
+        """
+        assert not self._parameters_returned, "Optimizer has already been initialized, this model would not train"
+        game_instance = task()
+        if self._input_size:
+            assert (4 * game_instance.num_cards +
+                    game_instance.num_players +
+                    len(game_instance.cards_per_suit)) == self._belief_size
+            assert game_instance.num_players == self._num_players
+        else:
+            self.set_task_parameters(game_instance)
+        layers = []
+        input_size = self._input_size
+        for layer_size in self._layer_sizes:
+            layers.append(nn.Linear(input_size, layer_size))
+            layers.append(nn.ReLU(inplace=True))
+            input_size = layer_size
+        layers.append(nn.Linear(input_size, self._belief_size))
+        self.models[task.name] = nn.Sequential(*layers).to(device)
+
+    def forward(self, x: torch.FloatTensor, task: str) -> torch.FloatTensor:
         """
         Forward pass of the model
         :param x: a shape (batch_size, belief_size + num_actions) torch Float tensor, beliefs concatenated with actions
+        :param task: the name of the task of which the model should be used
         :return: a shape (batch_size, belief_size) torch Float tensor, the predicted next belief
         """
-        fc_out = self.model(x)
+        if self._polynomial:
+            x = polynomial_transform(x)
+        fc_out = self.models[task](x)
         fc_out[:, :-self._num_players] = nn.Sigmoid()(fc_out[:, :-self._num_players])
         return fc_out
 
@@ -50,52 +103,86 @@ class TransitionModel(nn.Module):
         """
         bce_loss = nn.BCELoss()(pred[:, :-self._num_players], y[:, :-self._num_players])
         mse_loss = nn.MSELoss()(pred[:, -self._num_players:], y[:, -self._num_players:])
-        # TODO: Regularization?
         return bce_loss + mse_loss
-
-    def polynomial(self, x: torch.FloatTensor) -> torch.FloatTensor:
-        """
-        Return x raised to the second order polynomial basis
-        """
-        polynomial_basis = True
-        if polynomial_basis:
-            n, d = x.shape
-            x1 = torch.unsqueeze(torch.cat([torch.ones((n, 1)).to(device), x], dim=1), 1)
-            x = torch.unsqueeze(x, 2) * x1
-            return x.reshape(n, d * (d + 1))
-        return True
 
 
 class RewardModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> r
     """
-
-    def __init__(self, belief_size: int, num_actions: int):
+    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = True):
         """
-        :param belief_size: number of values in a belief
-        :param num_actions: number of possible actions, to be 1-hot encoded and attached to belief
+        :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
+        :param polynomial: whether or not to use the polynomial basis
         """
         super().__init__()
-        # h1, h2 = 200, 40
-        h1, h2 = 100, 20
-        d = belief_size + num_actions
-        input_size = d * (d + 1)
-        self.model = nn.Sequential(
-            nn.Linear(input_size, h1),
-            nn.ReLU(inplace=True),
-            nn.Linear(h1, h2),
-            nn.ReLU(inplace=True),
-            nn.Linear(h2, 1)
-        )
+        if layer_sizes is None:
+            # Default layer sizes
+            layer_sizes = [100, 20]
+            # layer_sizes = [200, 40]
+        self._layer_sizes = layer_sizes
 
-    def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        self._polynomial = polynomial
+        self._input_size = None
+        self._belief_size = None
+        self._parameters_returned = False
+        self.models = {}
+
+    def set_task_parameters(self, task_instance: TrickTakingGame):
+        """
+        Set parameters for task
+        :param task_instance: instance of task to sample parameters from
+        :return: None
+        """
+        num_actions = task_instance.num_cards
+        belief_size = 4 * num_actions + task_instance.num_players + len(task_instance.cards_per_suit)
+        d = belief_size + num_actions
+        self._input_size = d * (d + 1) if self._polynomial else d
+        self._belief_size = belief_size
+
+    def get_parameters(self) -> List:
+        """
+        :return: list of the parameters of all the models for use by an optimizer
+        """
+        self._parameters_returned = True
+        params = []
+        for model in self.models.values():
+            params.extend(list(model.parameters()))
+        return params
+
+    def make_model(self, task: TrickTakingGame.__class__):
+        """
+        Creates a model for a task.
+        :param task: class of the task for which a model should be created
+        :returns: None
+        """
+        assert not self._parameters_returned, "Optimizer has already been initialized, this model would not train"
+        game_instance = task()
+        if self._input_size:
+            assert (4 * game_instance.num_cards +
+                    game_instance.num_players +
+                    len(game_instance.cards_per_suit)) == self._belief_size
+        else:
+            self.set_task_parameters(game_instance)
+        layers = []
+        input_size = self._input_size
+        for layer_size in self._layer_sizes:
+            layers.append(nn.Linear(input_size, layer_size))
+            layers.append(nn.ReLU(inplace=True))
+            input_size = layer_size
+        layers.append(nn.Linear(input_size, 1))
+        self.models[task.name] = nn.Sequential(*layers).to(device)
+
+    def forward(self, x: torch.FloatTensor, task: str) -> torch.FloatTensor:
         """
         Forward pass of the model
         :param x: a shape (batch_size, belief_size + num_actions) torch Float tensor, beliefs concatenated with actions
+        :param task: the name of the task of which the model should be used
         :return: a shape (batch_size, 1) torch Float tensor, the predicted reward
         """
-        return self.model(x)
+        if self._polynomial:
+            x = polynomial_transform(x)
+        return self.models[task](x)
 
     def loss(self, pred: torch.FloatTensor, y: torch.FloatTensor) -> torch.FloatTensor:
         """
@@ -105,74 +192,4 @@ class RewardModel(nn.Module):
         :return: mean loss as a torch Float scalar
         """
         mse_loss = nn.MSELoss()(pred, y)
-        # TODO: Regularization?
         return mse_loss
-
-    def polynomial(self, x: torch.FloatTensor) -> torch.FloatTensor:
-        """
-        Return x to a polynomial order
-        """
-        polynomial_reward = True
-        if polynomial_reward:
-            n, d = x.shape
-            x1 = torch.unsqueeze(torch.cat([torch.ones((n, 1)).to(device), x], dim=1), 1)
-            x = torch.unsqueeze(x, 2) * x1
-            return x.reshape(n, d * (d + 1))
-        else:
-            return x
-
-
-# class PolicyNetwork(nn.Module):
-#     """
-#     Multilayered perceptron policy network to imitate the expert: (b,) ->
-#     """
-#
-#     def __init__(self, belief_size: int, num_actions: int):
-#         """
-#         :param belief_size: number of values in a belief
-#         :param num_actions: number of possible actions, to be 1-hot encoded and attached to belief
-#         """
-#         super().__init__()
-#         h1 = 160
-#         h2 = 60
-#         d = belief_size + num_actions
-#         input_size = d * (d + 1)
-#         self.model = nn.Sequential(
-#             nn.Linear(input_size, h1),
-#             nn.ReLU(inplace=True),
-#             nn.Linear(h1, h2),
-#             nn.ReLU(inplace=True),
-#             nn.Linear(h2, 1)
-#         )
-#
-#     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
-#         """
-#         Forward pass of the model
-#         :param x: a shape (batch_size, belief_size + num_actions) torch Float tensor, beliefs concatenated with actions
-#         :return: a shape (batch_size, 1) torch Float tensor, the predicted reward
-#         """
-#         return self.model(x)
-#
-#     def loss(self, pred: torch.FloatTensor, y: torch.FloatTensor) -> torch.FloatTensor:
-#         """
-#         Calculate the loss of a batch of predictions against the true labels
-#         :param pred: (batch_size, 1) predicted rewards
-#         :param y: (batch_size, 1) actual rewards
-#         :return: mean loss as a torch Float scalar
-#         """
-#         mse_loss = nn.MSELoss()(pred, y)
-#         # TODO: Regularization?
-#         return mse_loss
-#
-#     def polynomial(self, x: torch.FloatTensor) -> torch.FloatTensor:
-#         """
-#         Return x to a polynomial order
-#         """
-#         polynomial_reward = True
-#         if polynomial_reward:
-#             n, d = x.shape
-#             x1 = torch.unsqueeze(torch.cat([torch.ones((n, 1)).to(device), x], dim=1), 1)
-#             x = torch.unsqueeze(x, 2) * x1
-#             return x.reshape(n, d * (d + 1))
-#         else:
-#             return x

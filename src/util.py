@@ -1,4 +1,8 @@
+import torch
+
 from enum import Enum
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class Suit(Enum):
@@ -40,3 +44,15 @@ class Card:
 
 class OutOfTurnException(Exception):
     pass
+
+
+def polynomial_transform(x: torch.FloatTensor) -> torch.FloatTensor:
+    """
+    Return x raised to the second order polynomial basis, used for transforming an NN input.
+    :param x: tensor to transform
+    :returns: transformed tensor
+    """
+    n, d = x.shape
+    x1 = torch.unsqueeze(torch.cat([torch.ones((n, 1)).to(device), x], dim=1), 1)
+    x = torch.unsqueeze(x, 2) * x1
+    return x.reshape(n, d * (d + 1))
