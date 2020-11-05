@@ -1,3 +1,6 @@
+import itertools
+import multiprocessing
+from concurrent import futures
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -15,6 +18,21 @@ from evaluators import evaluate_random
 from game import Game
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+class ModelGameRunner:
+    def __init__(self, agent_type, task, agent_params, game_params):
+        self.agent_type = agent_type
+        self.task = task
+        self.agent_params = agent_params
+        self.game_params = game_params
+
+    def __call__(self, game_num):
+        # print(f"Running game {game_num}")
+        game = Game(self.task, [self.agent_type] * 4, self.agent_params, self.game_params)
+        result = game.run()
+        barbs = game.get_barbs()
+        return barbs
 
 
 class ModelBasedLearner(Learner):
@@ -69,6 +87,12 @@ class ModelBasedLearner(Learner):
         self.writer = SummaryWriter(f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
 
+        # multithreading
+        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
+        num_cpus = multiprocessing.cpu_count()
+        num_threads = int(num_cpus / 2)  # can use more or less CPUs
+        self.executor = futures.ProcessPoolExecutor(max_workers=num_threads)
+
     def train(self, tasks: List[TrickTakingGame.__class__]):
         for task in tasks:
             self._setup_single_task(task)
@@ -95,6 +119,7 @@ class ModelBasedLearner(Learner):
                                                                                   self._reward_model],
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
+                print("Done EVAL")
                 self.writer.add_scalar("eval_winrate", winrate, epoch)
                 self.writer.add_scalar("eval_matchrate", matchrate, epoch)
                 self.writer.add_scalar("eval_score_margin", avg_score, epoch)
@@ -121,7 +146,8 @@ class ModelBasedLearner(Learner):
         if task.name not in self._reward_model.models:
             self._reward_model.make_model(task)
 
-    def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int) -> Tuple[
+        np.ndarray, np.ndarray]:
         """
         Train a task for a single epoch, following the single-task learning framework
         :param task: class of task to train
@@ -142,7 +168,8 @@ class ModelBasedLearner(Learner):
 
         return np.mean(transition_loss), np.mean(reward_loss)
 
-    def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[Tuple[List[int], int, int, List[int]]]:
+    def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[
+        Tuple[List[int], int, int, List[int]]]:
         """
         Collect (b, a, r, b') experiences from playing self._games_per_epoch games against itself
         :param task: the class of the game to play
@@ -160,7 +187,8 @@ class ModelBasedLearner(Learner):
         return barbs
 
     def _train_world_models(self, task: TrickTakingGame.__class__,
-                            experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[np.ndarray, np.ndarray]:
+                            experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[
+        np.ndarray, np.ndarray]:
         """
         Train the transition and reward models on the experiences
         :param task: the class of the game to train models for
@@ -172,8 +200,10 @@ class ModelBasedLearner(Learner):
         # Construct belief_action input matrices
         experience_array = np.asarray(experiences, dtype=object)
         sample_task = task()
-        belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(sample_task.cards_per_suit)
-        belief_actions = np.pad(np.vstack(experience_array[:, 0]), (0, task().num_cards), 'constant')
+        belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(
+            sample_task.cards_per_suit)
+        belief_actions = np.pad(np.vstack(experience_array[:, 0]), (0, task().num_cards),
+                                'constant')
         actions = experience_array[:, 1].astype(np.int)
         indices = np.arange(len(experiences))
         belief_actions[indices, actions + belief_size] = 1

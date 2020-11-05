@@ -81,8 +81,7 @@ class BeliefBasedAgent(Agent):
         # + cards in play (BINARY) [maybe 1-HOT instead? but more variables]
         # + trick leader (1-HOT or all zeros) + trump suit (1-HOT)
         # + score (LINEAR)
-        belief = [0 for _ in range(num_cards * 4 +
-                                   len(self._game.cards_per_suit))]
+        belief = [0 for _ in range(num_cards * 4 + len(self._game.cards_per_suit))]
 
         # Cards in hand / discarded
         for card_index in range(num_cards):
@@ -96,7 +95,7 @@ class BeliefBasedAgent(Agent):
                 belief[2 * num_cards + card_index] = 1
         # Trick leader
         if observation[-2] != -1:
-            belief[3 * num_cards + observation[-2]] = 1
+            belief[num_cards + observation[-2]] = 1
         # Trump suit
         if observation[-3] != -1:
             belief[4 * num_cards + observation[-3]] = 1
