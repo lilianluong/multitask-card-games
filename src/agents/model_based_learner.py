@@ -22,7 +22,8 @@ class ModelBasedLearner(Learner):
                  agent: ModelBasedAgent.__class__ = ModelBasedAgent,
                  multitask: bool = False,
                  resume_model: Dict[str, Dict[str, Dict[str, Any]]] = None,
-                 model_names: Dict[str, str] = None):
+                 model_names: Dict[str, str] = None,
+                 learner_name: str = "MBL"):
         """
         :param agent: either ModelBasedAgent or a subclass to use
         :param multitask: whether to use multitask learning or not
@@ -31,6 +32,7 @@ class ModelBasedLearner(Learner):
                                     "state": model state dict
                                     "params": list of parameters to pass into model constructor
         :param model_names: maps task names to names to save model as
+        :param learner_name: name of the trial for tensorboard records
         """
         self._agent_type = agent
         self._model_names = model_names
@@ -64,7 +66,7 @@ class ModelBasedLearner(Learner):
         self._reward_lr = 1e-4
         self._transition_lr = 1e-4
 
-        self.writer = SummaryWriter(f"runs/dqn-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
+        self.writer = SummaryWriter(f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
 
     def train(self, tasks: List[TrickTakingGame.__class__]):

@@ -13,7 +13,7 @@ class MultitaskTransitionModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> b'
     """
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 1, polynomial: bool = True):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone
@@ -23,7 +23,7 @@ class MultitaskTransitionModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [800, 400, 220]
+            layer_sizes = [1000, 600, 300]
             # layer_sizes = [1200, 600, 220]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
@@ -123,7 +123,7 @@ class MultitaskRewardModel(nn.Module):
     Multilayered perceptron to approximate T: (b, a) -> r
     """
 
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 1, polynomial: bool = True):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone
@@ -133,7 +133,7 @@ class MultitaskRewardModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [100, 20]
+            layer_sizes = [180, 80, 30]
             # layer_sizes = [200, 40]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
