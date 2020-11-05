@@ -43,6 +43,8 @@ class TrickTakingGame:
     def __init__(self):
         self._num_cards = sum(self.cards_per_suit)
         self._state = None
+        self._index_card_map = None
+        self._num_cards = sum(self.cards_per_suit)
 
     def reset(self, state: List[int] = None) -> Tuple[List[int], ...]:
         """
@@ -71,7 +73,10 @@ class TrickTakingGame:
         assert len(
             self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
+        self._index_card_map = self._compute_index_card_map()
         return self._get_observations()
+
+
 
     def step(self, action: Tuple[int, int]) -> Tuple[
         Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
@@ -101,14 +106,15 @@ class TrickTakingGame:
         invalid_plays = {}
         if not self.is_valid_play(player, card_index):
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
-            # if self._state[card_index] == player:
-            #     rewards[player] -= 10
-            # else:
-            rewards[player] -= 50  # Huge penalty for picking an invalid card!
+            if self._state[card_index] == player:
+                rewards[player] -= 10 # bad if picking card in hand but not valid
+            else:
+                rewards[player] -= 100  # Huge penalty for picking an invalid card!
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             invalid_plays[player] = "invalid"
-        # else:
-            # rewards[player] += 20
+        else:
+            pass
+            # possible to reward player for making good choice here
 
         # Play the card
         self._state[card_index] = -1
@@ -138,7 +144,7 @@ class TrickTakingGame:
             self._state[-1] = next_leader
 
         # Check if game ended
-        if sum(self._state[:num_cards]) == -num_cards:
+        if self._game_has_ended():
             done = True
             # apply score bonuses
             bonus_rewards = self._end_game_bonuses()
@@ -164,6 +170,19 @@ class TrickTakingGame:
             print(self._state)
         else:
             print(self._get_observations()[view])
+
+    def _compute_index_card_map(self):
+        index_map = {}
+        for card_index in range(self.num_cards):
+            suit, total = 0, 0
+            while total + self.cards_per_suit[suit] <= card_index:
+                total += self.cards_per_suit[suit]
+                suit += 1
+            num = card_index - total
+            assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
+            index_map[card_index]=Card(suit=Suit(suit), value=num)
+        return index_map
+
 
     def _deal(self) -> List[int]:
         """
@@ -239,6 +258,12 @@ class TrickTakingGame:
         rewards = [0 for _ in range(self.num_players)]
         rewards[winning_player] = 1
         return rewards, winning_player
+
+    def _game_has_ended(self) -> bool:
+        """
+        :return: True if the game has ended
+        """
+        return sum(self._state[:self.num_cards]) == -self.num_cards
 
     def _get_trick_winner(self) -> Tuple[int, Card]:
         """
@@ -371,6 +396,7 @@ class TrickTakingGame:
         :param card_index: int, 0 <= card_index < self.num_cards
         :return: Card
         """
+        # TODO: run once in map and lookup in future
         suit, total = 0, 0
         while total + self.cards_per_suit[suit] <= card_index:
             total += self.cards_per_suit[suit]
@@ -378,6 +404,7 @@ class TrickTakingGame:
         num = card_index - total
         assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
         return Card(suit=Suit(suit), value=num)
+
 
     def card_to_index(self, card: Card) -> int:
         """

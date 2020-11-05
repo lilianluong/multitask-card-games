@@ -1,5 +1,8 @@
+import itertools
+import multiprocessing
 import random
 from collections import deque
+from concurrent import futures
 from datetime import datetime
 from typing import List, Tuple
 
@@ -12,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from agents.base import Learner
 from agents.belief_agent import BeliefBasedAgent
-from environments.hearts import SimpleHearts
+from environments.test_hearts import TestSimpleHearts
 from environments.trick_taking_game import TrickTakingGame
 from evaluators import evaluate_random
 from game import Game
@@ -21,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class DQN(nn.Module):
-    def __init__(self, observation_size, action_size, H1=100, H2=80, H3=60, H4=40):
+    def __init__(self, observation_size, action_size, H1=200, H2=160, H3=120, H4=60):
         """
 
         :param observation_size: Size of belief as defined in belief_agent.py
@@ -62,8 +65,7 @@ class DQNAgent(BeliefBasedAgent):
 
     def act(self, epsilon: float = 0):
         if np.random.rand() <= epsilon:
-            valid_cards = self._get_hand(self._current_observation, valid_only=False)
-            return random.sample(valid_cards, 1)[0]
+            return self._game.index_to_card(random.randint(0, self._game.num_cards - 1))
 
         # reformat observation into following format: hand +
         action_values = self.model.forward(torch.FloatTensor(self._belief).to(device))
@@ -75,28 +77,45 @@ class DQNAgent(BeliefBasedAgent):
         self._current_observation = observation
 
 
+class GameRunner:
+    def __init__(self, task, agent_params, game_params):
+        self.task = task
+        self.agent_params = agent_params
+        self.game_params = game_params
+
+    def __call__(self, game_num):
+        # print(f"Running game {game_num}")
+        game = Game(self.task, [DQNAgent] * 4, self.agent_params, self.game_params)
+        result = game.run()
+        barbs = game.get_barbs()
+        return barbs
+
+
+def calculate_action_observation_size(game):
+    # calculate parameter sizes
+    constant_game = game()
+    cards_per_suit = constant_game.cards_per_suit[0]
+    num_cards = constant_game.num_cards
+    return num_cards, num_cards*2
+
 class DQNLearner(Learner):
 
     def __init__(self, resume_state=None):
-
-        # calculate parameter sizes
-        constant_game = SimpleHearts()
-        cards_per_suit = constant_game.cards_per_suit[0]
-        num_cards = constant_game.num_cards
-        self.action_size = num_cards
-        self.observation_size = num_cards * 4 + cards_per_suit
-        self.memory = deque(maxlen=100)  # modification to dqn to preserve recent only
-        self.gamma = 0.95  # discount rate
+        self.action_size, self.observation_size = calculate_action_observation_size(TestSimpleHearts)
+        """ + len(
+            constant_game.cards_per_suit) + constant_game.num_players"""
+        self.memory = deque(maxlen=4000)  # modification to dqn to preserve recent only
+        self.gamma = 0.1  # discount rate
         self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
-        self.epsilon_min = 0.01  # min exploration
+        self.epsilon_min = 0.1  # min exploration
         self.epsilon_decay = 0.995  # to decrease exploration rate over time
         self.learning_rate = 5E-4
 
         # training hyperparams
         self.num_epochs = 5000
-        self.games_per_epoch = 3
-        self.batch_size = 20
-        self.num_batches = 2
+        self.games_per_epoch = 100
+        self.batch_size = 1000
+        self.num_batches = 5
 
         # Init agents and trainers
         self.model = DQN(self.observation_size, self.action_size).to(device)
@@ -106,24 +125,31 @@ class DQNLearner(Learner):
 
         self.evaluate_every = 50  # number of epochs to evaluate between
         self.step = 0
+        self.save_every = 1001  # save model every x iterations
+        self.save_base_path = "saved_models/agent"
 
         self.writer = SummaryWriter(f"runs/dqn {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
         # TODO: add network graph to tensborboard
+        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
 
     def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
+        num_cpus = multiprocessing.cpu_count()
+        num_threads = int(num_cpus * 3/4)  # can use more or less CPUs
+        executor = futures.ProcessPoolExecutor(max_workers=num_threads)
         for task in tasks:
             for epoch in range(self.num_epochs):
                 # collect experiences
                 print(f"Starting epoch {epoch}/{self.num_epochs}")
-                for game_num in range(self.games_per_epoch):
-                    # print(
-                    #     f"Running game {game_num}/{self.games_per_epoch} in epoch {epoch}/"
-                    #     f"{self.num_epochs}")
-                    game = Game(task, [DQNAgent] * 4, [{"model": self.model} for _ in range(4)],
-                                {"epsilon": self.epsilon, "verbose": False})
-                    result = game.run()
-                    barbs = game.get_barbs()
-                    self.memorize(barbs)
+                specific_game_func = GameRunner(task,
+                                                [{"model": self.model} for _ in
+                                                 range(4)], {"epsilon": self.epsilon,
+                                                             "verbose": False})
+                barb_futures = executor.map(specific_game_func, range(self.games_per_epoch),
+                                            chunksize=2)
+                # wait for completion
+                barbs = list(barb_futures)
+                barbs = list(itertools.chain.from_iterable(barbs))
+                self.memorize(barbs)
                 # update policy
                 losses = []
                 for _ in range(self.num_batches):
@@ -144,6 +170,10 @@ class DQNLearner(Learner):
                 if self.epsilon > self.epsilon_min:
                     self.epsilon *= self.epsilon_decay
                     self.writer.add_scalar("epsilon", self.epsilon, epoch)
+
+                if (epoch+1) % self.save_every == 0:
+                    # save model
+                    torch.save(self.model.state_dict(), f"{self.save_base_path}_{epoch}.pt")
 
         return self.model
 

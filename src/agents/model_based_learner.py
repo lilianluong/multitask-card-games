@@ -1,3 +1,5 @@
+import multiprocessing
+from concurrent import futures
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -15,6 +17,21 @@ from evaluators import evaluate_random
 from game import Game
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+class ModelGameRunner:
+    def __init__(self, agent_type, task, agent_params, game_params):
+        self.agent_type = agent_type
+        self.task = task
+        self.agent_params = agent_params
+        self.game_params = game_params
+
+    def __call__(self, game_num):
+        # print(f"Running game {game_num}")
+        game = Game(self.task, [self.agent_type] * 4, self.agent_params, self.game_params)
+        result = game.run()
+        barbs = game.get_barbs()
+        return barbs
 
 
 class ModelBasedLearner(Learner):
@@ -55,7 +72,7 @@ class ModelBasedLearner(Learner):
                 self._reward_model.models[key].load_state_dict(item["state"])
 
         # Hyperparameters
-        self._num_epochs = 10000
+        self._num_epochs = 500
         self._games_per_epoch = 20
         self._batch_size = 112
 
@@ -66,13 +83,21 @@ class ModelBasedLearner(Learner):
         self._reward_lr = 1e-4
         self._transition_lr = 1e-4
 
-        self.writer = SummaryWriter(f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
+        self.writer = SummaryWriter(
+            f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
+
+        # multithreading
+        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
+        num_cpus = multiprocessing.cpu_count()
+        num_threads = int(num_cpus / 2)  # can use more or less CPUs
+        self.executor = futures.ProcessPoolExecutor(max_workers=num_threads)
 
     def train(self, tasks: List[TrickTakingGame.__class__]):
         for task in tasks:
             self._setup_single_task(task)
-        self._transition_optimizer = optim.Adam(self._transition_model.get_parameters(), lr=self._transition_lr)
+        self._transition_optimizer = optim.Adam(self._transition_model.get_parameters(),
+                                                lr=self._transition_lr)
         self._reward_optimizer = optim.Adam(self._reward_model.get_parameters(), lr=self._reward_lr)
 
         for epoch in range(self._num_epochs):
@@ -82,19 +107,24 @@ class ModelBasedLearner(Learner):
                 transition_losses.append(transition_loss)
                 reward_losses.append(reward_loss)
 
-            # for task in tasks:
-            #     self._train_agent_policy(task)
+            self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_losses),
+                                   epoch)
 
-            self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_losses), epoch)
             self.writer.add_scalar("avg_training_reward_loss", np.mean(reward_losses), epoch)
 
             if epoch % self.evaluate_every == 0:
                 winrate, matchrate, avg_score, invalid, scores = evaluate_random(tasks,
                                                                                  self._agent_type,
-                                                                                 [self._transition_model,
-                                                                                  self._reward_model],
+                                                                                 {
+                                                                                     task.name:
+                                                                                         self.get_models(
+                                                                                             task)
+                                                                                     for task in
+                                                                                     tasks},
+
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
+                print("Done EVAL")
                 self.writer.add_scalar("eval_winrate", winrate, epoch)
                 self.writer.add_scalar("eval_matchrate", matchrate, epoch)
                 self.writer.add_scalar("eval_score_margin", avg_score, epoch)
@@ -116,99 +146,118 @@ class ModelBasedLearner(Learner):
         :param task: class of task to setup
         :return: None
         """
-        if task.name not in self._transition_model.models:
-            self._transition_model.make_model(task)
-        if task.name not in self._reward_model.models:
-            self._reward_model.make_model(task)
-
-    def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Train a task for a single epoch, following the single-task learning framework
-        :param task: class of task to train
-        :param epoch: the index of the current epoch
-        :return: (average transition loss, average reward loss)
-        """
-        if epoch % 10 == 0:
-            print(f"Starting epoch {epoch}/{self._num_epochs} for {task.name}")
-
-        experiences = self._agent_evaluation(task)
-        transition_loss, reward_loss = self._train_world_models(task, experiences)
-
-        if (epoch + 1) % 200 == 0:
-            torch.save(self._transition_model.models[task.name].state_dict(),
-                       "models/transition_model_temp_{}.pt".format(self._model_names[task.name]))
-            torch.save(self._reward_model.models[task.name].state_dict(),
-                       "models/reward_model_temp_{}.pt".format(self._model_names[task.name]))
-
-        return np.mean(transition_loss), np.mean(reward_loss)
-
-    def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[Tuple[List[int], int, int, List[int]]]:
-        """
-        Collect (b, a, r, b') experiences from playing self._games_per_epoch games against itself
-        :param task: the class of the game to play
-        :return: list of (b, a, r, b') experiences
-        """
-        barbs = []
-        for game_num in range(self._games_per_epoch):
-            # print("Game", game_num)
-            game = Game(task, [self._agent_type] * 4, [{"transition_model": self._transition_model,
-                                                        "reward_model": self._reward_model}
-                                                       for _ in range(task().num_players)],
-                        {"epsilon": self.epsilon, "verbose": False})
-            game.run()  # result = game.run()
-            barbs.extend(game.get_barbs())
-        return barbs
-
-    def _train_world_models(self, task: TrickTakingGame.__class__,
-                            experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Train the transition and reward models on the experiences
-        :param task: the class of the game to train models for
-        :param experiences: list of (b, a, r, b') experiences as returned by _agent_evaluation
-        :return: (transition loss mean, reward loss mean)
-        """
-        transition_losses, reward_losses = [], []
-
-        # Construct belief_action input matrices
-        experience_array = np.asarray(experiences, dtype=object)
         sample_task = task()
-        belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(sample_task.cards_per_suit)
-        belief_actions = np.pad(np.vstack(experience_array[:, 0]), (0, task().num_cards), 'constant')
-        actions = experience_array[:, 1].astype(np.int)
-        indices = np.arange(len(experiences))
-        belief_actions[indices, actions + belief_size] = 1
+        belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(
+            sample_task.cards_per_suit)
+        if task.name not in self._transition_models:
+            self._transition_models[task.name] = TransitionModel(belief_size,
+                                                                 sample_task.num_cards,
+                                                                 sample_task.num_players).to(device)
+        if task.name not in self._reward_models:
+            self._reward_models[task.name] = RewardModel(belief_size, sample_task.num_cards).to(
+                device)
+        self._transition_optimizers[task.name] = optim.Adam(
+            self._transition_models[task.name].parameters())
+        self._reward_optimizers[task.name] = optim.Adam(self._reward_models[task.name].parameters(),
+                                                        lr=1e-4)
 
-        rewards = np.vstack(experience_array[:, 2])
-        next_beliefs = np.vstack(experience_array[:, 3])
 
-        # Shuffle data
-        np.random.shuffle(indices)
-        belief_actions = torch.from_numpy(belief_actions[indices]).float().to(device)
-        rewards = torch.from_numpy(rewards[indices]).float().to(device)
-        next_beliefs = torch.from_numpy(next_beliefs[indices]).float().to(device)
+def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int) -> Tuple[
+    np.ndarray, np.ndarray]:
+    """
+    Train a task for a single epoch, following the single-task learning framework
+    :param task: class of task to train
+    :param epoch: the index of the current epoch
+    :return: (average transition loss, average reward loss)
+    """
+    if epoch % 10 == 0:
+        print(f"Starting epoch {epoch}/{self._num_epochs} for {task.name}")
 
-        # Train
-        for model, optimizer, targets, losses in (
-                (self._transition_model, self._transition_optimizer, next_beliefs, transition_losses),
-                (self._reward_model, self._reward_optimizer, rewards, reward_losses),
-        ):
-            for i in range(0, len(experiences), self._batch_size):
-                x = belief_actions[i: i + self._batch_size]
-                pred = model.forward(x, task.name)
-                y = targets[i: i + self._batch_size]
-                loss = model.loss(pred, y)
-                losses.append(loss.item())
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+    experiences = self._agent_evaluation(task)
+    transition_loss, reward_loss = self._train_world_models(task, experiences)
+
+    if (epoch + 1) % 200 == 0:
+        torch.save(self._transition_model.models[task.name].state_dict(),
+                   "models/transition_model_temp_{}.pt".format(self._model_names[task.name]))
+        torch.save(self._reward_model.models[task.name].state_dict(),
+                   "models/reward_model_temp_{}.pt".format(self._model_names[task.name]))
+
+    return np.mean(transition_loss), np.mean(reward_loss)
+
+
+def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[
+    Tuple[List[int], int, int, List[int]]]:
+    """
+    Collect (b, a, r, b') experiences from playing self._games_per_epoch games against itself
+    :param task: the class of the game to play
+    :return: list of (b, a, r, b') experiences
+    """
+    barbs = []
+    for game_num in range(self._games_per_epoch):
+        # print("Game", game_num)
+        game = Game(task, [self._agent_type] * 4, [{"transition_model": self._transition_model,
+                                                    "reward_model": self._reward_model}
+                                                   for _ in range(task().num_players)],
+                    {"epsilon": self.epsilon, "verbose": False})
+        game.run()  # result = game.run()
+        barbs.extend(game.get_barbs())
+
+    return barbs
+
+
+def _train_world_models(self, task: TrickTakingGame.__class__,
+                        experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[
+    np.ndarray, np.ndarray]:
+    """
+    Train the transition and reward models on the experiences
+    :param task: the class of the game to train models for
+    :param experiences: list of (b, a, r, b') experiences as returned by _agent_evaluation
+    :return: (transition loss mean, reward loss mean)
+    """
+    transition_losses, reward_losses = [], []
+
+    # Construct belief_action input matrices
+    experience_array = np.asarray(experiences, dtype=object)
+    sample_task = task()
+    belief_size = 4 * sample_task.num_cards + sample_task.num_players + len(
+        sample_task.cards_per_suit)
+    belief_actions = np.pad(np.vstack(experience_array[:, 0]), (0, task().num_cards),
+                            'constant')
+    actions = experience_array[:, 1].astype(np.int)
+    indices = np.arange(len(experiences))
+    belief_actions[indices, actions + belief_size] = 1
+
+    rewards = np.vstack(experience_array[:, 2])
+    next_beliefs = np.vstack(experience_array[:, 3])
+
+    # Shuffle data
+    np.random.shuffle(indices)
+    belief_actions = torch.from_numpy(belief_actions[indices]).float().to(device)
+    rewards = torch.from_numpy(rewards[indices]).float().to(device)
+    next_beliefs = torch.from_numpy(next_beliefs[indices]).float().to(device)
+
+    # Train
+    for model, optimizer, targets, losses in (
+            (self._transition_model, self._transition_optimizer, next_beliefs, transition_losses),
+            (self._reward_model, self._reward_optimizer, rewards, reward_losses),
+    ):
+        for i in range(0, len(experiences), self._batch_size):
+            x = belief_actions[i: i + self._batch_size]
+            pred = model.forward(x, task.name)
+            y = targets[i: i + self._batch_size]
+            loss = model.loss(pred, y)
+            losses.append(loss.item())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         return np.mean(transition_losses), np.mean(reward_losses)
         # return 0, np.mean(reward_losses)
 
-    def _train_agent_policy(self, task: TrickTakingGame.__class__):
-        """
-        Train a policy for the agent. TODO: What should this involve?
-        :param task: the class of the game to train for
-        :return: None
-        """
-        pass  # currently involves no learned policy
+def _train_agent_policy(self, task: TrickTakingGame.__class__):
+    """
+    Train a policy for the agent. TODO: What should this involve?
+    :param task: the class of the game to train for
+    :return: None
+    """
+    pass  # currently involves no learned policy
