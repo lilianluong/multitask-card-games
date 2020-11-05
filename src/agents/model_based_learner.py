@@ -119,7 +119,6 @@ class ModelBasedLearner(Learner):
                                                                                   self._reward_model],
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
-                print("Done EVAL")
                 self.writer.add_scalar("eval_winrate", winrate, epoch)
                 self.writer.add_scalar("eval_matchrate", matchrate, epoch)
                 self.writer.add_scalar("eval_score_margin", avg_score, epoch)
