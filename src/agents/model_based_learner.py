@@ -72,7 +72,8 @@ class ModelBasedLearner(Learner):
         self._reward_lr = 1e-4
         self._transition_lr = 1e-4
 
-        self.writer = SummaryWriter(f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
+        self.writer = SummaryWriter(
+            f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
 
         # multithreading
@@ -84,7 +85,8 @@ class ModelBasedLearner(Learner):
     def train(self, tasks: List[TrickTakingGame.__class__]):
         for task in tasks:
             self._setup_single_task(task)
-        self._transition_optimizer = optim.Adam(self._transition_model.get_parameters(), lr=self._transition_lr)
+        self._transition_optimizer = optim.Adam(self._transition_model.get_parameters(),
+                                                lr=self._transition_lr)
         self._reward_optimizer = optim.Adam(self._reward_model.get_parameters(), lr=self._reward_lr)
 
         for epoch in range(self._num_epochs):
@@ -97,14 +99,16 @@ class ModelBasedLearner(Learner):
             # for task in tasks:
             #     self._train_agent_policy(task)
 
-            self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_losses), epoch)
+            self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_losses),
+                                   epoch)
             self.writer.add_scalar("avg_training_reward_loss", np.mean(reward_losses), epoch)
 
             if epoch % self.evaluate_every == 0:
                 winrate, matchrate, avg_score, invalid, scores = evaluate_random(tasks,
                                                                                  self._agent_type,
-                                                                                 [self._transition_model,
-                                                                                  self._reward_model],
+                                                                                 [
+                                                                                     self._transition_model,
+                                                                                     self._reward_model],
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
                 self.writer.add_scalar("eval_winrate", winrate, epoch)
@@ -165,9 +169,9 @@ class ModelBasedLearner(Learner):
         barbs = []
         agent_setting = [self._agent_type] * 4
         agent_params = [{"transition_model": self._transition_model,
-                                                            "reward_model": self._reward_model}
-                                                           for _ in range(task().num_players)]
-        game_params =  {"epsilon": self.epsilon, "verbose": False}
+                         "reward_model": self._reward_model}
+                        for _ in range(task().num_players)]
+        game_params = {"epsilon": self.epsilon, "verbose": False}
         if self._use_thread:
             # Run games concurrently using callable object
             specific_game_func = GameRunner(task, self._agent_type, agent_params, game_params)
@@ -217,7 +221,8 @@ class ModelBasedLearner(Learner):
 
         # Train
         for model, optimizer, targets, losses in (
-                (self._transition_model, self._transition_optimizer, next_beliefs, transition_losses),
+                (self._transition_model, self._transition_optimizer, next_beliefs,
+                 transition_losses),
                 (self._reward_model, self._reward_optimizer, rewards, reward_losses),
         ):
             for i in range(0, len(experiences), self._batch_size):
