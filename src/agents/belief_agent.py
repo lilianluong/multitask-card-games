@@ -95,7 +95,7 @@ class BeliefBasedAgent(Agent):
                 belief[2 * num_cards + card_index] = 1
         # Trick leader
         if observation[-2] != -1:
-            belief[num_cards + observation[-2]] = 1
+            belief[3 * num_cards + observation[-2]] = 1
         # Trump suit
         if observation[-3] != -1:
             belief[4 * num_cards + observation[-3]] = 1

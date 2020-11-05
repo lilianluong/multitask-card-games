@@ -45,11 +45,11 @@ if __name__ == "__main__":
     for i in range(5):
         train([TestSimpleHearts, TrickTakingGame],
               None,
-              {"Test Simple Hearts": f"multitask3_tsh_{i}", "Trick Taking Game": f"multitask3_ttg_{i}"},
+              {"Test Simple Hearts": f"multitask_tsh_{i}", "Trick Taking Game": f"multitask_ttg_{i}"},
               multitask=True,
-              learner_name=f"multitask3-{i}")
+              learner_name=f"multitask-{i}")
         train([TestSimpleHearts, TrickTakingGame],
               None,
-              {"Test Simple Hearts": f"singletask3_tsh_{i}", "Trick Taking Game": f"singletask3_ttg_{i}"},
+              {"Test Simple Hearts": f"singletask_tsh_{i}", "Trick Taking Game": f"singletask_ttg_{i}"},
               multitask=False,
-              learner_name=f"singletask3-{i}")
+              learner_name=f"singletask-{i}")
