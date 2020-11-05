@@ -76,12 +76,6 @@ class ModelBasedLearner(Learner):
             f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
 
-        # multithreading
-        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
-        num_cpus = multiprocessing.cpu_count()
-        num_threads = int(num_cpus / 2)  # can use more or less CPUs
-        self.executor = futures.ProcessPoolExecutor(max_workers=num_threads)
-
     def train(self, tasks: List[TrickTakingGame.__class__]):
         for task in tasks:
             self._setup_single_task(task)
