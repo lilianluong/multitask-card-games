@@ -5,7 +5,7 @@ from agents.belief_agent import BeliefBasedAgent
 from agents.human import Human
 from agents.random_agent import RandomAgent
 from environments.trick_taking_game import TrickTakingGame
-from util import Card
+from agents.utils.util import Card
 
 
 class Game:

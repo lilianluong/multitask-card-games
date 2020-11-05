@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 from agents.base import Learner, Agent
 from environments.trick_taking_game import TrickTakingGame
-from util import Card
+from agents.utils.util import Card
 
 
 class RandomAgent(Agent):

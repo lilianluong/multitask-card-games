@@ -1,7 +1,7 @@
 from typing import List, Tuple
 
 from environments.trick_taking_game import TrickTakingGame
-from util import Card, Suit
+from agents.utils.util import Card, Suit
 
 
 class TestSimpleHearts(TrickTakingGame):

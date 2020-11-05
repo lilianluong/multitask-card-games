@@ -1,9 +1,7 @@
 import random
 from typing import Dict, List, Tuple, Union
 
-import numpy as np
-
-from util import Card, OutOfTurnException, Suit
+from agents.utils.util import Card, OutOfTurnException, Suit
 
 
 class TrickTakingGame:

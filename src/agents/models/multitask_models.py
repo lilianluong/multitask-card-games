@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 from environments.trick_taking_game import TrickTakingGame
-from util import polynomial_transform
+from agents.utils.util import polynomial_transform
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

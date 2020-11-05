@@ -3,7 +3,7 @@ from typing import Tuple, List
 
 from agents.base import Agent
 from environments.trick_taking_game import TrickTakingGame
-from util import Card
+from agents.utils.util import Card
 
 
 class Human(Agent):

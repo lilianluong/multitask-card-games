@@ -13,26 +13,12 @@ from agents.base import Learner
 from agents.model_based_agent import ModelBasedAgent
 from agents.models.model_based_models import RewardModel, TransitionModel
 from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
+from agents.utils.game_runner import GameRunner
 from environments.trick_taking_game import TrickTakingGame
 from evaluators import evaluate_random
 from game import Game
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-
-class ModelGameRunner:
-    def __init__(self, agent_type, task, agent_params, game_params):
-        self.agent_type = agent_type
-        self.task = task
-        self.agent_params = agent_params
-        self.game_params = game_params
-
-    def __call__(self, game_num):
-        # print(f"Running game {game_num}")
-        game = Game(self.task, [self.agent_type] * 4, self.agent_params, self.game_params)
-        result = game.run()
-        barbs = game.get_barbs()
-        return barbs
 
 
 class ModelBasedLearner(Learner):
@@ -41,7 +27,8 @@ class ModelBasedLearner(Learner):
                  multitask: bool = False,
                  resume_model: Dict[str, Dict[str, Dict[str, Any]]] = None,
                  model_names: Dict[str, str] = None,
-                 learner_name: str = "MBL"):
+                 learner_name: str = "MBL",
+                 threading: bool = None):
         """
         :param agent: either ModelBasedAgent or a subclass to use
         :param multitask: whether to use multitask learning or not
@@ -52,6 +39,7 @@ class ModelBasedLearner(Learner):
         :param model_names: maps task names to names to save model as
         :param learner_name: name of the trial for tensorboard records
         """
+        super().__init__(threading=threading)
         self._agent_type = agent
         self._model_names = model_names
         if multitask:
@@ -175,14 +163,25 @@ class ModelBasedLearner(Learner):
         :return: list of (b, a, r, b') experiences
         """
         barbs = []
-        for game_num in range(self._games_per_epoch):
-            # print("Game", game_num)
-            game = Game(task, [self._agent_type] * 4, [{"transition_model": self._transition_model,
-                                                        "reward_model": self._reward_model}
-                                                       for _ in range(task().num_players)],
-                        {"epsilon": self.epsilon, "verbose": False})
-            game.run()  # result = game.run()
-            barbs.extend(game.get_barbs())
+        agent_setting = [self._agent_type] * 4
+        agent_params = [{"transition_model": self._transition_model,
+                                                            "reward_model": self._reward_model}
+                                                           for _ in range(task().num_players)]
+        game_params =  {"epsilon": self.epsilon, "verbose": False}
+        if self._use_thread:
+            # Run games concurrently using callable object
+            specific_game_func = GameRunner(task, self._agent_type, agent_params, game_params)
+            barb_futures = self.executor.map(specific_game_func, range(self._games_per_epoch),
+                                             chunksize=4)
+            # wait for completion
+            barbs = list(barb_futures)
+            barbs = list(itertools.chain.from_iterable(barbs))
+        else:
+            for game_num in range(self._games_per_epoch):
+                # print("Game", game_num)
+                game = Game(task, agent_setting, agent_params, game_params)
+                game.run()  # result = game.run()
+                barbs.extend(game.get_barbs())
         return barbs
 
     def _train_world_models(self, task: TrickTakingGame.__class__,

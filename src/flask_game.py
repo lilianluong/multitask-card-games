@@ -10,7 +10,7 @@ from agents.base import Agent
 from agents.human import Human
 from environments.trick_taking_game import TrickTakingGame
 from game import Game
-from util import Card, Suit
+from agents.utils.util import Card, Suit
 
 
 class FlaskGame(Game):

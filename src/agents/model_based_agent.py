@@ -11,7 +11,7 @@ from agents.belief_agent import BeliefBasedAgent
 from agents.models.model_based_models import RewardModel, TransitionModel
 from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
 from environments.trick_taking_game import TrickTakingGame
-from util import Card
+from agents.utils.util import Card
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
