@@ -1,6 +1,4 @@
 import itertools
-import multiprocessing
-from concurrent import futures
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -28,7 +26,8 @@ class ModelBasedLearner(Learner):
                  resume_model: Dict[str, Dict[str, Dict[str, Any]]] = None,
                  model_names: Dict[str, str] = None,
                  learner_name: str = "MBL",
-                 threading: bool = None):
+                 threading: bool = None,
+                 executor=None):
         """
         :param agent: either ModelBasedAgent or a subclass to use
         :param multitask: whether to use multitask learning or not
@@ -39,7 +38,9 @@ class ModelBasedLearner(Learner):
         :param model_names: maps task names to names to save model as
         :param learner_name: name of the trial for tensorboard records
         """
-        super().__init__(threading=threading)
+        #
+        super().__init__(threading=False)
+        self.executor = executor
         self._agent_type = agent
         self._model_names = model_names
         if multitask:

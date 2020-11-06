@@ -1,3 +1,6 @@
+import multiprocessing
+from concurrent import futures
+
 import torch
 
 from agents.model_based_learner import ModelBasedLearner
@@ -16,7 +19,7 @@ MODEL_PARAMS = {
 }
 
 
-def train(tasks, load_model_names, save_model_names, multitask, learner_name):
+def train(tasks, load_model_names, save_model_names, multitask, learner_name, executor):
     # Set up learner
     if load_model_names:
         resume = {"transition": {}, "reward": {}}
@@ -29,7 +32,7 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
         resume = None
     learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names,
                                 resume_model=resume, multitask=multitask,
-                                learner_name=learner_name)
+                                learner_name=learner_name, executor=executor)
 
     # # Evaluate
     # evaluate = evaluate_random(tasks,
@@ -42,14 +45,20 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
 
 
 if __name__ == "__main__":
-    for i in range(5):
+    torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
+    num_cpus = multiprocessing.cpu_count()
+    num_threads = int(num_cpus / 2)  # can use more or less CPUs
+    executor = futures.ProcessPoolExecutor(max_workers=num_threads)
+    for i in range(3):
         train([TestSimpleHearts, TrickTakingGame],
               None,
               {"Test Simple Hearts": f"multitask_tsh_{i}", "Trick Taking Game": f"multitask_ttg_{i}"},
               multitask=True,
-              learner_name=f"multitask-{i}")
+              learner_name=f"multitask-{i}",
+              executor=executor)
         train([TestSimpleHearts, TrickTakingGame],
               None,
               {"Test Simple Hearts": f"singletask_tsh_{i}", "Trick Taking Game": f"singletask_ttg_{i}"},
               multitask=False,
-              learner_name=f"singletask-{i}")
+              learner_name=f"singletask-{i}",
+              executor=executor)
