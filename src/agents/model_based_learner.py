@@ -41,6 +41,7 @@ class ModelBasedLearner(Learner):
         #
         super().__init__(threading=False)
         self.executor = executor
+        self._use_thread = True
         self._agent_type = agent
         self._model_names = model_names
         if multitask:
