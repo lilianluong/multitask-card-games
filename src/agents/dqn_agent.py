@@ -24,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class DQN(nn.Module):
-    def __init__(self, observation_size, action_size, H1=100, H2=80, H3=60, H4=30):
+    def __init__(self, observation_size, action_size, H1=200, H2=160, H3=120, H4=60):
         """
 
         :param observation_size: Size of belief as defined in belief_agent.py
@@ -91,16 +91,17 @@ class GameRunner:
         return barbs
 
 
+def calculate_action_observation_size(game):
+    # calculate parameter sizes
+    constant_game = game()
+    cards_per_suit = constant_game.cards_per_suit[0]
+    num_cards = constant_game.num_cards
+    return num_cards, num_cards*2
+
 class DQNLearner(Learner):
 
     def __init__(self, resume_state=None):
-
-        # calculate parameter sizes
-        constant_game = TestSimpleHearts()
-        cards_per_suit = constant_game.cards_per_suit[0]
-        num_cards = constant_game.num_cards
-        self.action_size = num_cards
-        self.observation_size = num_cards * 2
+        self.action_size, self.observation_size = calculate_action_observation_size(TestSimpleHearts)
         """ + len(
             constant_game.cards_per_suit) + constant_game.num_players"""
         self.memory = deque(maxlen=4000)  # modification to dqn to preserve recent only
@@ -133,7 +134,7 @@ class DQNLearner(Learner):
 
     def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
         num_cpus = multiprocessing.cpu_count()
-        num_threads = int(num_cpus / 2)  # can use more or less CPUs
+        num_threads = int(num_cpus * 3/4)  # can use more or less CPUs
         executor = futures.ProcessPoolExecutor(max_workers=num_threads)
         for task in tasks:
             for epoch in range(self.num_epochs):

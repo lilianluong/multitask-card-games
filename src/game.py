@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict, Any
+from typing import Any, Dict, List, Tuple, Union
 
 from agents.base import Agent
 from agents.belief_agent import BeliefBasedAgent
@@ -51,13 +51,16 @@ class Game:
         self._game_params = game_params
         self._info = []
 
-    def run(self) -> List[int]:
+    def run(self, state: List[int] = None) -> Tuple[List[int], List[int]]:
         """
         Start and play the game. Can only be called once per instance of Game.
-        :return: final score of the game
+        :param state: initial state to force the game to
+        :return: final score of the game, its initial state
         """
         assert self._observations is None, "game has already been played"
-        self._observations = self._game.reset()
+        self._observations = self._game.reset(state=state)
+        initial_state = self._game._state[:]
+        if state: assert state == initial_state
         self._update_observations(-1, None, self._observations,
                                   [None] * len(self._agent_list))  # set initial observations
         done = False
@@ -80,7 +83,7 @@ class Game:
         # Game has finished
         self._game_ended()
 
-        return self._game.scores
+        return self._game.scores, initial_state
 
     def _print_report(self,
                       round_number: int,
@@ -141,9 +144,10 @@ class Game:
         raise NotImplementedError
 
     def _update_observations(self, player_who_went: int,
-                             card_played: Card,
+                             card_played: Union[Card, None],
                              observations: Tuple[List[int], ...],
-                             rewards: Tuple[int, ...], ):
+                             rewards: Union[Tuple[int, ...], Tuple[None, ...]],
+                             ):
         """
         Updates the observations of each player
 

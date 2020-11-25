@@ -60,14 +60,3 @@ class Learner:
         :return: Trained model
         """
         pass
-
-    @abc.abstractmethod
-    def initialize_agent(self, game: TrickTakingGame, player_number: int) -> Agent:
-        """
-        Given an instance of a TrickTakingGame, return an Agent that will play it.
-
-        :param game: instance of TrickTakingGame to play
-        :param player_number: the index of the player in the game
-        :return: an instance of Agent that will play game
-        """
-        pass

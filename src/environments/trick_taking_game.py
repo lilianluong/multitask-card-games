@@ -41,10 +41,12 @@ class TrickTakingGame:
     name = "Trick Taking Game"
 
     def __init__(self):
+        self._num_cards = sum(self.cards_per_suit)
         self._state = None
+        self._index_card_map = None
         self._num_cards = sum(self.cards_per_suit)
 
-    def reset(self) -> Tuple[List[int], ...]:
+    def reset(self, state: List[int] = None) -> Tuple[List[int], ...]:
         """
         Reset the state for a new game, and return initial observations.
 
@@ -55,20 +57,27 @@ class TrickTakingGame:
             [score of player j | 0 <= j < self.num_players] +
             [trump suit number or -1, trick leading card index or -1, index of player to move next]
 
+        :param state: the state to force the game to start at
         :return: Tuple[List[int], ...] of observations
         """
-        card_distribution = self._deal()
-        self._state = (
-                card_distribution +
-                [-1 for _ in range(self.num_players)] +
-                [0 for _ in range(self.num_players)] +
-                [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
-        )
+        if state is None:
+            card_distribution = self._deal()
+            self._state = (
+                    card_distribution +
+                    [-1 for _ in range(self.num_players)] +
+                    [0 for _ in range(self.num_players)] +
+                    [self._get_trump_suit(), -1, self._get_first_player(card_distribution)]
+            )
+        else:
+            self._state = state
 
         assert len(
             self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
+        self._index_card_map = self._compute_index_card_map()
         return self._get_observations()
+
+
 
     def step(self, action: Tuple[int, int]) -> Tuple[
         Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
@@ -99,7 +108,7 @@ class TrickTakingGame:
         if not self.is_valid_play(player, card_index):
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
             if self._state[card_index] == player:
-                rewards[player] -= 10
+                rewards[player] -= 10 # bad if picking card in hand but not valid
             else:
                 rewards[player] -= 100  # Huge penalty for picking an invalid card!
             card_index = random.choice(valid_cards)  # Choose random valid move to play
@@ -123,7 +132,8 @@ class TrickTakingGame:
         if -1 not in played_cards:
             # Handle rewards
             trick_rewards, next_leader = self._end_trick()
-            rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
+            total_rewards = sum(trick_rewards)
+            rewards = [rewards[i] + 1.3 * trick_rewards[i] - 0.3 * total_rewards for i in range(num_players)]
             for i in range(num_players):
                 offset = num_cards + num_players  # index into state correctly
                 self._state[offset + i] += trick_rewards[i]  # update current scores
@@ -161,6 +171,19 @@ class TrickTakingGame:
             print(self._state)
         else:
             print(self._get_observations()[view])
+
+    def _compute_index_card_map(self):
+        index_map = {}
+        for card_index in range(self.num_cards):
+            suit, total = 0, 0
+            while total + self.cards_per_suit[suit] <= card_index:
+                total += self.cards_per_suit[suit]
+                suit += 1
+            num = card_index - total
+            assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
+            index_map[card_index]=Card(suit=Suit(suit), value=num)
+        return index_map
+
 
     def _deal(self) -> List[int]:
         """
@@ -382,6 +405,7 @@ class TrickTakingGame:
         num = card_index - total
         assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
         return Card(suit=Suit(suit), value=num)
+
 
     def card_to_index(self, card: Card) -> int:
         """
