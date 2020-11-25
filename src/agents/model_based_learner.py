@@ -202,6 +202,7 @@ class ModelBasedLearner(Learner):
         :param experiences: list of (b, a, r, b') experiences as returned by _agent_evaluation
         :return: (transition loss mean, reward loss mean)
         """
+
         transition_losses, reward_losses = [], []
 
         # Construct belief_action input matrices

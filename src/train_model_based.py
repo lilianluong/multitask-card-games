@@ -5,13 +5,15 @@ from agents.random_agent import RandomAgent
 from environments.test_hearts import TestSimpleHearts
 from environments.trick_taking_game import TrickTakingGame
 from environments.hearts import SimpleHearts
+from environments.twentyfive import TwentyFive
 from evaluators import evaluate_random
 
 
 MODEL_PARAMS = {
     "Trick Taking Game": [104, 24, 4],
     "Test Simple Hearts": [104, 24, 4],
-    "Simple Hearts": [136, 32, 4]
+    "Simple Hearts": [136, 32, 4], 
+    "Test TwentyFive": [104, 24, 4]
 }
 
 
@@ -39,7 +41,8 @@ def train(tasks, load_model_names, save_model_names):
 
 
 if __name__ == "__main__":
-    train([TestSimpleHearts, TrickTakingGame],
-          None,
-          {"Test Simple Hearts": "6card_killbot_1", "Trick Taking Game": "ttg_killbot_1"}
-          )
+    train([TwentyFive], None, {"Test TwentyFive": "test"})
+    # train([TestSimpleHearts, TrickTakingGame],
+    #       None,
+    #       {"Test Simple Hearts": "6card_killbot_1", "Trick Taking Game": "ttg_killbot_1"}
+    #       )

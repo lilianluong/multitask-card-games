@@ -27,7 +27,6 @@ class TwentyFive(TrickTakingGame):
 		'''
 		Overridden to add card redistribution under "reset trick". 
 		'''
-
 		assert len(action) == 2, "invalid action"
 		player, card_index = action
 		assert card_index < self.num_cards, "Trying to pick card with index higher than allowed"
@@ -66,7 +65,6 @@ class TwentyFive(TrickTakingGame):
 
 		# Check if trick completed
 		played_cards = self._state[num_cards: num_cards + num_players]
-
 		if -1 not in played_cards:
 		    # Handle rewards
 			trick_rewards, next_leader = self._end_trick()
@@ -81,8 +79,7 @@ class TwentyFive(TrickTakingGame):
 			self._state[-2] = -1
 			self._state[-1] = next_leader
 			card_distribution = self._deal() #for now, assuming that we'll have to deal every time -- 20 cards needed and 32 - 20 < 20
-			self._state += (card_distribution + [0]*(len(self._state) - len(card_distribution)))
-
+			self._state[:self.num_cards] = card_distribution
 
 		# Check if game ended
 		if self._game_has_ended():
@@ -152,7 +149,7 @@ class TwentyFive(TrickTakingGame):
 		return max(self.scores) == 25
 
 	def is_valid_play(self, player_index, card_index) -> bool:
-		
+
 		if self._state[card_index] != player_index:
 			return False
 
@@ -166,9 +163,9 @@ class TwentyFive(TrickTakingGame):
 			for i in range(self.num_cards):
 				card_in_hand = self.index_to_card(i)
 				if self._state[i] == player_index and \
-					(card_in_hand.suit == starting_card.suit or \
-					(card_in_hand.suit == self.trump_suit and card_in_hand.value not in {5, 11}) or \
-					card_in_hand != Card(Suit.HEARTS, self._num_cards-1)): 
+					(card_in_hand.suit == starting_card.suit): # or \
+					# (card_in_hand.suit == self.trump_suit and card_in_hand.value not in {5, 11}) or \
+					# card_in_hand == Card(Suit.HEARTS, self._num_cards-1)): 
 					return False
 		return True
 
