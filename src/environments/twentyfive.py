@@ -66,6 +66,7 @@ class TwentyFive(TrickTakingGame):
 
 		# Check if trick completed
 		played_cards = self._state[num_cards: num_cards + num_players]
+
 		if -1 not in played_cards:
 		    # Handle rewards
 			trick_rewards, next_leader = self._end_trick()
