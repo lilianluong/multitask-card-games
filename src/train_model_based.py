@@ -7,6 +7,7 @@ from environments.trick_taking_game import TrickTakingGame
 from environments.hearts import SimpleHearts
 from environments.twentyfive import TwentyFive
 from environments.hattrick import HatTrick
+from environments.basic_trick import BasicTrick
 from evaluators import evaluate_random
 
 
@@ -15,7 +16,8 @@ MODEL_PARAMS = {
     "Test Simple Hearts": [104, 24, 4],
     "Simple Hearts": [136, 32, 4], 
     "Test TwentyFive": [136, 32, 4],
-    "Test HatTrick": [136, 32, 4]
+    "Test HatTrick": [136, 32, 4], 
+    "Test Basic Trick": [136, 32, 4]
 }
 
 
