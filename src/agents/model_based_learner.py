@@ -1,3 +1,5 @@
+import itertools
+
 import multiprocessing
 from concurrent import futures
 from datetime import datetime
@@ -12,6 +14,7 @@ from agents.base import Learner
 from agents.model_based_agent import ModelBasedAgent
 from agents.models.model_based_models import RewardModel, TransitionModel
 from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
+
 from environments.trick_taking_game import TrickTakingGame
 from evaluators import evaluate_random
 from game import Game
@@ -38,7 +41,7 @@ class ModelBasedLearner(Learner):
     def __init__(self,
                  agent: ModelBasedAgent.__class__ = ModelBasedAgent,
                  multitask: bool = False,
-                 resume_model: Dict[str, Dict[str, Dict[str, Any]]] = None,
+                 resume_model: Dict[Fstr, Dict[str, Dict[str, Any]]] = None,
                  model_names: Dict[str, str] = None,
                  learner_name: str = "MBL"):
         """
@@ -109,7 +112,6 @@ class ModelBasedLearner(Learner):
 
             self.writer.add_scalar("avg_training_transition_loss", np.mean(transition_losses),
                                    epoch)
-
             self.writer.add_scalar("avg_training_reward_loss", np.mean(reward_losses), epoch)
 
             if epoch % self.evaluate_every == 0:
@@ -121,7 +123,6 @@ class ModelBasedLearner(Learner):
                                                                                              task)
                                                                                      for task in
                                                                                      tasks},
-
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
                 print("Done EVAL")
@@ -184,7 +185,6 @@ def _train_single_task(self, task: TrickTakingGame.__class__, epoch: int) -> Tup
 
     return np.mean(transition_loss), np.mean(reward_loss)
 
-
 def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[
     Tuple[List[int], int, int, List[int]]]:
     """
@@ -192,22 +192,22 @@ def _agent_evaluation(self, task: TrickTakingGame.__class__) -> List[
     :param task: the class of the game to play
     :return: list of (b, a, r, b') experiences
     """
-    barbs = []
-    for game_num in range(self._games_per_epoch):
-        # print("Game", game_num)
-        game = Game(task, [self._agent_type] * 4, [{"transition_model": self._transition_model,
-                                                    "reward_model": self._reward_model}
-                                                   for _ in range(task().num_players)],
-                    {"epsilon": self.epsilon, "verbose": False})
-        game.run()  # result = game.run()
-        barbs.extend(game.get_barbs())
+    specific_game_func = ModelGameRunner(self._agent_type, task,
+                                         [{"transition_model": self._transition_models[
+                                             task.name],
+                                           "reward_model": self._reward_models[task.name]}
+                                          for _ in range(task().num_players)],
+                                         {"epsilon": self.epsilon, "verbose": False})
 
+    barb_futures = self.executor.map(specific_game_func, range(self._games_per_epoch),
+                                     chunksize=4)
+    # wait for completion
+    barbs = list(barb_futures)
+    barbs = list(itertools.chain.from_iterable(barbs))
     return barbs
 
-
 def _train_world_models(self, task: TrickTakingGame.__class__,
-                        experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[
-    np.ndarray, np.ndarray]:
+                        experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[np.ndarray, np.ndarray]:
     """
     Train the transition and reward models on the experiences
     :param task: the class of the game to train models for
@@ -237,13 +237,17 @@ def _train_world_models(self, task: TrickTakingGame.__class__,
     next_beliefs = torch.from_numpy(next_beliefs[indices]).float().to(device)
 
     # Train
-    for model, optimizer, targets, losses in (
-            (self._transition_model, self._transition_optimizer, next_beliefs, transition_losses),
-            (self._reward_model, self._reward_optimizer, rewards, reward_losses),
+    for model_dict, optim_dict, targets, losses in (
+            (self._transition_models, self._transition_optimizers, next_beliefs,
+             transition_losses),
+            (self._reward_models, self._reward_optimizers, rewards, reward_losses),
     ):
+        model = model_dict[task.name]
+        optimizer = optim_dict[task.name]
         for i in range(0, len(experiences), self._batch_size):
             x = belief_actions[i: i + self._batch_size]
-            pred = model.forward(x, task.name)
+            x = model.polynomial(x)
+            pred = model.forward(x)
             y = targets[i: i + self._batch_size]
             loss = model.loss(pred, y)
             losses.append(loss.item())
@@ -251,8 +255,7 @@ def _train_world_models(self, task: TrickTakingGame.__class__,
             loss.backward()
             optimizer.step()
 
-        return np.mean(transition_losses), np.mean(reward_losses)
-        # return 0, np.mean(reward_losses)
+    return np.mean(transition_losses), np.mean(reward_losses)
 
 def _train_agent_policy(self, task: TrickTakingGame.__class__):
     """
