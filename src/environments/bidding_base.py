@@ -86,10 +86,13 @@ class BiddingBase(TrickTakingGame):
 
             self._player_bids = new_player_bids
 
-            self._state[-1] = (player + 1) % num_players
+            self._state[-1] = self._get_next_player(player)
             return self._get_observations(), tuple(rewards), False, invalid_plays
         else:
             return super().step(action)
 
     def _valid_bids(self, proposed_bids: List) -> bool:
         return True
+
+    def _get_next_player(self, player):
+        return (player + 1) % self.num_players
