@@ -28,7 +28,7 @@ class Agent:
         pass
 
     @abc.abstractmethod
-    def act(self, epsilon: float = 0) -> Card:
+    def act(self, epsilon: float = 0) -> int:
         """
         Based on the current observation/belief/known state, select a Card to play.
         :return: the card to play
