@@ -18,83 +18,19 @@ class TwentyFive(TrickTakingGame):
 
     The game is won when a player earns 25 points -- AKA collects 5 tricks.
 
+    Variations on normal game:
+    - No ante(win at 25 points)
+    - No robbing the pack
+    - No jinking (nonstandard anyway)
+    - No reneging
+    - No strange ranking based on suit
     '''
 
     name = 'Twenty-Five'
 
-    def step(self, action: Tuple[int, int]) -> Tuple[
-        Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
-        '''
-        Overridden to add card redistribution under "reset trick".
-        '''
-        assert len(action) == 2, "invalid action"
-        player, card_index = action
-        assert card_index < self.num_cards, "Trying to pick card with index higher than allowed"
-        num_cards = self.num_cards
-        num_players = self.num_players
-
-        rewards = [0 for _ in range(num_players)]
-
-        # Check if it is this player's turn
-        if player != self.next_player:
-            return self._get_observations(), tuple(rewards), False, {"error": OutOfTurnException}
-
-        # Check if the card is a valid play
-        invalid_plays = {}
-        if not self.is_valid_play(player, card_index):
-            valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
-            if self._state[card_index] == player:
-                rewards[player] -= 10
-            else:
-                rewards[player] -= 100  # Huge penalty for picking an invalid card!
-            card_index = random.choice(valid_cards)  # Choose random valid move to play
-            invalid_plays[player] = "invalid"
-        else:
-            pass
-        # possible to reward player for making good choice here
-
-        # Play the card
-        self._state[card_index] = -1
-        assert self._state[num_cards + player] == -1, "Trying to play in a trick already played in"
-        self._state[num_cards + player] = card_index
-        if self._state[-2] == -1:
-            # Trick leader
-            self._state[-2] = card_index
-        # update next player
-        self._state[-1] = (player + 1) % num_players
-
-        # Check if trick completed
-        played_cards = self._state[num_cards: num_cards + num_players]
-        if -1 not in played_cards:
-            # Handle rewards
-            trick_rewards, next_leader = self._end_trick()
-            rewards = [rewards[i] + trick_rewards[i] for i in range(num_players)]
-            for i in range(num_players):
-                offset = num_cards + num_players  # index into state correctly
-                self._state[offset + i] += trick_rewards[i]  # update current scores
-
-            # Reset trick
-            for i in range(num_cards, num_cards + num_players):
-                self._state[i] = -1
-            self._state[-2] = -1
-            self._state[-1] = next_leader
-            card_distribution = self._deal()  # for now, assuming that we'll have to deal every
-            # time -- 20 cards needed and 32 - 20 < 20
-            self._state[:self.num_cards] = card_distribution
-
-        # Check if game ended
-        if self._game_has_ended():
-            done = True
-            # apply score bonuses
-            bonus_rewards = self._end_game_bonuses()
-            rewards = [rewards[i] + bonus_rewards[i] for i in range(num_players)]
-            for i in range(num_players):
-                offset = num_cards + num_players
-                self._state[offset + i] += bonus_rewards[i]
-        else:
-            done = False
-
-        return self._get_observations(), tuple(rewards), done, invalid_plays
+    # TODO: randomize trump suit at beginning of each game
+    def _get_trump_suit(self) -> Suit:
+        return Suit.SPADES
 
     def _deal(self) -> List[int]:
         '''
@@ -149,9 +85,6 @@ class TwentyFive(TrickTakingGame):
                     trump_played = True
         return winning_index, winning_card
 
-    def _game_has_ended(self) -> bool:
-        return max(self.scores) == 25
-
     def is_valid_play(self, player_index, card_index) -> bool:
 
         if self._state[card_index] != player_index:
@@ -163,12 +96,15 @@ class TwentyFive(TrickTakingGame):
 
         if starting_card is None:
             return True
+
+        # always allow trump suit
         if played_card.suit != starting_card.suit and played_card.suit != self.trump_suit:
             for i in range(self.num_cards):
                 card_in_hand = self.index_to_card(i)
                 if self._state[i] == player_index and \
-                        (card_in_hand.suit == starting_card.suit):  # or \
-                    # (card_in_hand.suit == self.trump_suit and card_in_hand.value not in {5, 11}) or \
+                        (card_in_hand.suit == starting_card.suit):
+                    # TODO: allow reneging
+                    # or (card_in_hand.suit == self.trump_suit and card_in_hand.value not in {5, 11}) or \
                     # card_in_hand == Card(Suit.HEARTS, self._num_cards-1)):
                     return False
         return True

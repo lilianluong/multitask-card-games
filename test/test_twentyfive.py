@@ -30,13 +30,14 @@ class OhHellTest(unittest.TestCase):
 
         game.reset(state)
 
-        plays = [0, 1, 0, 2,
-                 0, 1, 2, 3, 5, 6, 7, 4]
-        for turn in range(12):
+        plays = [0, 1, 2, 3, 5, 6, 7, 4]
+        for turn in range(8):
             next_player = game.next_player
             play = plays[turn]
             observations, rewards, done, info = game.step((next_player, play))
-            if turn != 11:
+            if turn != 7 and turn != 3:
                 self.assertTrue(rewards == tuple([0] * 4))
+            elif turn == 3:
+                self.assertEqual(rewards, (-1.5, 5, -1.5, -1.5)) # normalized
             else:
-                self.assertEqual(rewards, (10, 11, 10, 1))
+                self.assertEqual(rewards, (-1.5, -1.5, -1.5, 5))
