@@ -21,18 +21,20 @@ MODEL_PARAMS = {
 }
 
 
-def train(tasks, load_model_names, save_model_names):
+def train(tasks, load_model_names, save_model_names, multitask, learner_name):
     # Set up learner
     if load_model_names:
         resume = {"transition": {}, "reward": {}}
         for task in tasks:
             transition_state = torch.load("models/transition_model_temp_{}.pt".format(load_model_names[task.name]))
             reward_state = torch.load("models/reward_model_temp_{}.pt".format(load_model_names[task.name]))
-            resume["transition"][task.name] = {"state": transition_state, "params": MODEL_PARAMS[task.name]}
-            resume["reward"][task.name] = {"state": reward_state, "params": MODEL_PARAMS[task.name][:-1]}
+            resume["transition"][task.name] = {"state": transition_state, "task": task}
+            resume["reward"][task.name] = {"state": reward_state, "task": task}
     else:
         resume = None
-    learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names, resume_model=resume)
+    learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names,
+                                resume_model=resume, multitask=multitask,
+                                learner_name=learner_name)
 
     # # Evaluate
     # evaluate = evaluate_random(tasks,
@@ -45,8 +47,14 @@ def train(tasks, load_model_names, save_model_names):
 
 
 if __name__ == "__main__":
-    train([TwentyFive], None, {"Test TwentyFive": "test"})
-    # train([TestSimpleHearts, TrickTakingGame],
-    #       None,
-    #       {"Test Simple Hearts": "6card_killbot_1", "Trick Taking Game": "ttg_killbot_1"}
-    #       )
+    for i in range(5):
+        train([TestSimpleHearts, TrickTakingGame],
+              None,
+              {"Test Simple Hearts": f"multitask_tsh_{i}", "Trick Taking Game": f"multitask_ttg_{i}"},
+              multitask=True,
+              learner_name=f"multitask2-{i}")
+        train([TestSimpleHearts, TrickTakingGame],
+              None,
+              {"Test Simple Hearts": f"singletask_tsh_{i}", "Trick Taking Game": f"singletask_ttg_{i}"},
+              multitask=False,
+              learner_name=f"singletask2-{i}")

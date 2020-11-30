@@ -2,13 +2,14 @@ import math
 import random
 import time
 from collections import deque, defaultdict
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
 import numpy as np
 import torch
 
 from agents.belief_agent import BeliefBasedAgent
-from agents.model_based_models import RewardModel, TransitionModel
+from agents.models.model_based_models import RewardModel, TransitionModel
+from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
 
@@ -20,9 +21,10 @@ action_tensor_cache = {}
 class ModelBasedAgent(BeliefBasedAgent):
     def __init__(self, game: TrickTakingGame,
                  player_number: int,
-                 transition_model: TransitionModel,
-                 reward_model: RewardModel):
+                 transition_model: Union[TransitionModel, MultitaskTransitionModel],
+                 reward_model: Union[RewardModel, MultitaskRewardModel]):
         super().__init__(game, player_number)
+        self._task_name = game.name
         self._transition_model = transition_model
         self._reward_model = reward_model
         self._current_observation = None
@@ -51,14 +53,10 @@ class ModelBasedAgent(BeliefBasedAgent):
             belief, first_action, reward, steps = nodes.popleft()
             if steps == horizon: break
             x = torch.cat([belief.repeat(actions, 1), action_tensor_cache[actions]], dim=1)
-            action_values = self._reward_model.forward(
-                self._reward_model.polynomial(x)
-            )
+            action_values = self._reward_model.forward(x, self._task_name)
             next_beliefs = None
             if steps < horizon - 1:
-                next_beliefs = self._transition_model.forward(
-                    self._transition_model.polynomial(x)
-                )
+                next_beliefs = self._transition_model.forward(x, self._task_name)
             for i in range(actions):
                 new_reward = inverse_discount * reward + action_values[i].item()
                 if steps < horizon - 1:
@@ -76,8 +74,8 @@ class ModelBasedAgent(BeliefBasedAgent):
 class MonteCarloAgent(ModelBasedAgent):
     def __init__(self, game: TrickTakingGame,
                  player_number: int,
-                 transition_model: TransitionModel,
-                 reward_model: RewardModel,
+                 transition_model: Union[TransitionModel, MultitaskTransitionModel],
+                 reward_model: Union[RewardModel, MultitaskRewardModel],
                  timeout: float = 0.5,
                  horizon: int = 4,
                  inverse_discount = 1.2):
@@ -103,10 +101,10 @@ class MonteCarloAgent(ModelBasedAgent):
             else:
                 a = current[-1]
                 ba = torch.cat([nodes[current[:-1]], actions[a:a + 1]], dim=1)
-                belief = self._transition_model.forward(self._transition_model.polynomial(ba))
+                belief = self._transition_model.forward(ba, self._task_name)
                 nodes[current] = belief
             belief_action = torch.cat([belief, actions[selected_action:selected_action + 1]], dim=1)
-            reward = self._reward_model.forward(self._reward_model.polynomial(belief_action))
+            reward = self._reward_model.forward(belief_action, self._task_name)
             reward_cache[new_node] = reward
         return reward
 

@@ -107,10 +107,7 @@ class TrickTakingGame:
         invalid_plays = {}
         if not self.is_valid_play(player, card_index):
             valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
-            if self._state[card_index] == player:
-                rewards[player] -= 10 # bad if picking card in hand but not valid
-            else:
-                rewards[player] -= 100  # Huge penalty for picking an invalid card!
+            rewards[player] -= 50  # Huge penalty for picking an invalid card!
             card_index = random.choice(valid_cards)  # Choose random valid move to play
             invalid_plays[player] = "invalid"
         else:
@@ -183,7 +180,6 @@ class TrickTakingGame:
             assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
             index_map[card_index]=Card(suit=Suit(suit), value=num)
         return index_map
-
 
     def _deal(self) -> List[int]:
         """
