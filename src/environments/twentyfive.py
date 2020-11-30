@@ -38,7 +38,7 @@ class TwentyFive(TrickTakingGame):
         '''
         cards = []
         for i in range(self.num_players):
-            cards += [i for _ in range(5)]  # revisit, is 5 the best number for a reduced deck?
+            cards += [i for _ in range(5)]
         cards += [-1] * (self.num_cards - len(cards))
         random.shuffle(cards)
         return cards

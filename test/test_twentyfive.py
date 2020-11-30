@@ -14,9 +14,9 @@ class Mini25(TwentyFive):
         return 2, 2, 2, 2
 
 
-class OhHellTest(unittest.TestCase):
+class TwentyFiveTest(unittest.TestCase):
     def test_game(self):
-        game = Game(Mini25, [RandomAgent] * 4)
+        game = Game(TwentyFive, [RandomAgent] * 4)
         result = game.run()
         print(result)
         self.assertTrue(result is not None)
@@ -41,3 +41,5 @@ class OhHellTest(unittest.TestCase):
                 self.assertEqual(rewards, (-1.5, 5, -1.5, -1.5)) # normalized
             else:
                 self.assertEqual(rewards, (-1.5, -1.5, -1.5, 5))
+
+    # TODO: write test for bigger game to test odd trumps
