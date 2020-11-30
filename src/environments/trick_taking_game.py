@@ -1,8 +1,6 @@
 import random
 from typing import Dict, List, Tuple, Union
 
-import numpy as np
-
 from util import Card, OutOfTurnException, Suit
 
 
@@ -46,7 +44,7 @@ class TrickTakingGame:
         self._index_card_map = None
         self._num_cards = sum(self.cards_per_suit)
 
-    def reset(self, state: List[int] = None) -> Tuple[List[int], ...]:
+    def reset(self, state: List[int] = None, assert_size: bool = True) -> Tuple[List[int], ...]:
         """
         Reset the state for a new game, and return initial observations.
 
@@ -57,6 +55,7 @@ class TrickTakingGame:
             [score of player j | 0 <= j < self.num_players] +
             [trump suit number or -1, trick leading card index or -1, index of player to move next]
 
+        :param assert_size: Enable checking of state size
         :param state: the state to force the game to start at
         :return: Tuple[List[int], ...] of observations
         """
@@ -70,8 +69,10 @@ class TrickTakingGame:
             )
         else:
             self._state = state
-        assert len(
-            self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
+
+        if assert_size:
+            assert len(
+                self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
         self._index_card_map = self._compute_index_card_map()
         return self._get_observations()
