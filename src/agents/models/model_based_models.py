@@ -23,7 +23,7 @@ class TransitionModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [800, 400, 220]
+            layer_sizes = [300, 200, 150]
             # layer_sizes = [1200, 600, 220]
         self._layer_sizes = layer_sizes
 
@@ -117,7 +117,7 @@ class RewardModel(nn.Module):
         super().__init__()
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [100, 20]
+            layer_sizes = [60, 20]
             # layer_sizes = [200, 40]
         self._layer_sizes = layer_sizes
 
@@ -258,9 +258,9 @@ class ApprenticeModel(nn.Module):
     def forward(self, x: torch.FloatTensor, task: str) -> torch.FloatTensor:
         """
         Forward pass of the model
-        :param x: a shape (batch_size, belief_size + num_actions) torch Float tensor, beliefs concatenated with actions
+        :param x: a shape (batch_size, belief_size) torch Float tensor, beliefs
         :param task: the name of the task of which the model should be used
-        :return: a shape (batch_size, 1) torch Float tensor, the predicted reward
+        :return: a shape (batch_size, num_actions) torch Float tensor, scores on actions
         """
         if self._polynomial:
             x = polynomial_transform(x)
@@ -269,9 +269,9 @@ class ApprenticeModel(nn.Module):
     def loss(self, pred: torch.FloatTensor, y: torch.FloatTensor) -> torch.FloatTensor:
         """
         Calculate the loss of a batch of predictions against the true labels
-        :param pred: (batch_size, 1) predicted rewards
-        :param y: (batch_size, 1) actual rewards
-        :return: mean loss as a torch Float scalar
+        :param pred: (batch_size, num_actions) predicted action scores
+        :param y: (batch_size, action) expert action selections
+        :return: cross entropy loss as a torch Float scalar
         """
-        mse_loss = nn.MSELoss()(pred, y)
-        return mse_loss
+        loss = nn.CrossEntropyLoss()(pred, y)
+        return loss

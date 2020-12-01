@@ -23,7 +23,7 @@ class ExecutorManager:
                 torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
 
                 num_cpus = multiprocessing.cpu_count()
-                ExecutorManager.num_threads = 1 #int(num_cpus / 2)  # can use more or less CPUs
+                ExecutorManager.num_threads = int(num_cpus / 2)  # can use more or less CPUs
                 ExecutorManager.executor = multiprocessing.Pool(ExecutorManager.num_threads)
 
         return ExecutorManager.num_threads, ExecutorManager.executor
@@ -77,4 +77,3 @@ class Learner:
     def __init__(self, use_thread: bool = None):
         self._use_thread = use_thread
         self.num_threads, self.executor = ExecutorManager.get_executor(use_thread)
-

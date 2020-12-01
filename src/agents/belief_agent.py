@@ -41,7 +41,7 @@ class BeliefBasedAgent(Agent):
             self._player_action = action
         self._running_action = action
         self._running_reward += reward if reward else 0
-        self._belief = self._update_belief(observation)
+        self._belief = self.update_belief(observation)
 
     def barb(self) -> Union[None, Tuple[List[int], int, int, List[int]]]:
         """
@@ -71,7 +71,7 @@ class BeliefBasedAgent(Agent):
         return 4 * self._game.num_cards + self._game.num_players
         # return self._game.num_cards * 4 + self._game.num_players + len(self._game.cards_per_suit)
 
-    def _update_belief(self, observation: List[int]) -> List[int]:
+    def update_belief(self, observation: List[int]) -> List[int]:
         """
         Updates the current belief based on the observation
         Should NOT mutate the current belief, the belief is reassigned in self.observe(...)
