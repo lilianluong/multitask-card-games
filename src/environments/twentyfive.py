@@ -29,7 +29,7 @@ class TwentyFive(TrickTakingGame):
     name = 'Twenty-Five'
 
     # TODO: randomize trump suit at beginning of each game
-    def _get_trump_suit(self) -> Suit:
+    def get_trump_suit(self) -> Suit:
         return Suit.SPADES
 
     def _deal(self) -> List[int]:
