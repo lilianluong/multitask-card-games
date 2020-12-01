@@ -11,6 +11,7 @@ from util import Card
 
 class ExecutorManager:
     executor = None
+    num_threads = None
 
     @staticmethod
     def get_executor(use_thread):
@@ -18,15 +19,14 @@ class ExecutorManager:
             is_linux = sys.platform == "linux" or sys.platform == "linux2"
             use_thread = use_thread if use_thread is not None else is_linux
             if use_thread:
-                try:
-                    torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
-                except RuntimeError:
-                    pass
-                num_cpus = multiprocessing.cpu_count()
-                num_threads = int(num_cpus / 2)  # can use more or less CPUs
-                ExecutorManager.executor = multiprocessing.Pool()
 
-        return ExecutorManager.executor
+                torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
+
+                num_cpus = multiprocessing.cpu_count()
+                ExecutorManager.num_threads = 1 #int(num_cpus / 2)  # can use more or less CPUs
+                ExecutorManager.executor = multiprocessing.Pool(ExecutorManager.num_threads)
+
+        return ExecutorManager.num_threads, ExecutorManager.executor
 
 
 class Agent:
@@ -76,4 +76,5 @@ class Learner:
     @abc.abstractmethod
     def __init__(self, use_thread: bool = None):
         self._use_thread = use_thread
-        self.executor = ExecutorManager.get_executor(use_thread)
+        self.num_threads, self.executor = ExecutorManager.get_executor(use_thread)
+

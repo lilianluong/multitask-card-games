@@ -18,10 +18,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 action_tensor_cache = {}
 
 
-def mcts(executor, num_workers, belief, num_actions, game, transition_model, reward_model, task_name,
-                 timeout: float = 0.5,
-                 horizon: int = 4,
-                 inverse_discount=1.2) -> int:
+def mcts(executor, num_workers, belief, game, transition_model, reward_model, task_name,
+         timeout: float = 0.5,
+         horizon: int = 4,
+         inverse_discount=1.2) -> int:
     """
     Given models and state, outputs action
     :param executor:
@@ -31,24 +31,32 @@ def mcts(executor, num_workers, belief, num_actions, game, transition_model, rew
     :param inverse_discount:
     :return:
     """
-    mcts_helper = MCTSRunner(game, transition_model, reward_model, task_name, timeout, horizon, inverse_discount)
-    thread_results = executor.map(mcts_helper, [belief]*num_workers)
+    mcts_helper = _MCTSRunner(game, transition_model, reward_model, task_name, timeout, horizon,
+                              inverse_discount)
+    thread_results = executor.map(mcts_helper, [belief] * num_workers)
     thread_scores, thread_plays = list(map(list, zip(*thread_results)))
     # combine scores lists
-    scores_counter = [Counter(el) for el in thread_scores]
-    scores = dict(sum(scores_counter))
+    scores_counter = Counter()
+    for d in thread_scores:
+        scores_counter.update(d)
+    scores = dict(scores_counter)
     # combine plays lists
-    plays_counter = [Counter(el) for el in thread_plays]
-    plays = dict(sum(plays_counter))
+    plays_counter = Counter()
+    for d in thread_plays:
+        plays_counter.update(d)
+    plays = dict(plays_counter)
     # compute best move
-    list_actions = list(range(num_actions))
+    list_actions = list(range(game.num_cards))
     card_index = max(list_actions,
                      key=lambda a: scores[(a,)] / plays[(a,)] if plays[(a,)] else -float('inf'))
     return card_index
 
 
+class _MCTSRunner:
+    """
+    Helper class for mcts()
+    """
 
-class MCTSRunner:
     def __init__(self, game, transition_model, reward_model, task_name,
                  timeout: float = 0.5,
                  horizon: int = 4,
@@ -136,9 +144,10 @@ class MCTSRunner:
 
             # Backpropagation
             for i in range(horizon + 1):
-                scores[final_current[:i]] += total_reward
+                scores[final_current[:i]] += total_reward.item()
             lowest_score = min(lowest_score, total_reward)
 
+        # detach tensors
         return scores, plays
 
 
@@ -240,62 +249,6 @@ class MonteCarloAgent(ModelBasedAgent):
             # return random.sample(valid_cards, 1)[0]
 
         # Monte Carlo
-        t0 = time.time()
-        timeout = self._timeout
-        horizon = self._horizon
-        inverse_discount = self._inverse_discount
-        start_belief = torch.FloatTensor([self._belief]).to(device)
-        actions = torch.eye(self._game.num_cards).float().to(device)
-        num_actions = self._game.num_cards
-        list_actions = list(range(num_actions))
-        nodes = {tuple(): start_belief}
-        plays = defaultdict(int)
-        reward_cache = {}
-        scores = defaultdict(float)
-        lowest_score = 1
-        while time.time() - t0 < timeout:
-            current = tuple()
-            plays[current] += 1
-            total_reward = 0
-
-            # Selection
-            while len(current) < horizon and current + (0,) in plays:
-                action_values = [MonteCarloAgent.ucb(scores[current + (a,)],
-                                                     plays[current + (a,)],
-                                                     plays[current],
-                                                     lowest_score)
-                                 for a in list_actions]
-                selected_action = max(list_actions, key=lambda a: action_values[a])
-                reward = self.get_transition_reward(current, selected_action, reward_cache, nodes,
-                                                    actions)
-                total_reward = inverse_discount * total_reward + reward
-                current = current + (selected_action,)
-                plays[current] += 1
-
-            # Expansion
-            if len(current) < horizon and current + (0,) not in plays:
-                plays[current + (0,)] = 0
-                selected_action = random.randint(0, num_actions - 1)  # TODO: only expand legally
-                reward = self.get_transition_reward(current, selected_action, reward_cache, nodes,
-                                                    actions)
-                total_reward = inverse_discount * total_reward + reward
-                current = current + (selected_action,)
-                plays[current] += 1
-            final_current = current
-
-            # Simulation
-            while len(current) < horizon:
-                selected_action = random.randint(0, num_actions - 1)  # TODO: only expand legally
-                reward = self.get_transition_reward(current, selected_action, reward_cache, nodes,
-                                                    actions)
-                total_reward = inverse_discount * total_reward + reward
-                current = current + (selected_action,)
-
-            # Backpropagation
-            for i in range(horizon + 1):
-                scores[final_current[:i]] += total_reward
-            lowest_score = min(lowest_score, total_reward)
-
-        card_index = max(list_actions,
-                         key=lambda a: scores[(a,)] / plays[(a,)] if plays[(a,)] else -float('inf'))
+        card_index = mcts(torch.multiprocessing.Pool(2), 2, self._belief, self._game,
+                          self._transition_model, self._reward_model, self._task_name)
         return self._game.index_to_card(card_index)
