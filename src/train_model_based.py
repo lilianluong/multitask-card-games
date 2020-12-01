@@ -1,5 +1,6 @@
 import torch
 
+from agents.model_based_agent import MonteCarloAgent
 from agents.model_based_learner import ModelBasedLearner, ModelBasedAgent
 from agents.random_agent import RandomAgent
 from environments.test_hearts import TestSimpleHearts
@@ -32,7 +33,7 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
             resume["reward"][task.name] = {"state": reward_state, "task": task}
     else:
         resume = None
-    learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names,
+    learner = ModelBasedLearner(agent=MonteCarloAgent, model_names=save_model_names,
                                 resume_model=resume, multitask=multitask,
                                 learner_name=learner_name)
 

@@ -1,35 +1,40 @@
 import abc
+import multiprocessing
 import sys
 from concurrent import futures
 from typing import List, Set, Tuple
 
 import torch
-from torch import multiprocessing
 
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
 
-
-def _get_executor(use_thread):
-    is_linux = sys.platform == "linux" or sys.platform == "linux2"
-    use_thread = use_thread if use_thread is not None else is_linux
+class ExecutorManager:
     executor = None
-    if use_thread:
-        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
-        num_cpus = multiprocessing.cpu_count()
-        num_threads = int(num_cpus / 2)  # can use more or less CPUs
-        executor = futures.ProcessPoolExecutor(max_workers=num_threads)
-    return executor
+
+    @staticmethod
+    def get_executor(use_thread):
+        if ExecutorManager.executor is None:
+            is_linux = sys.platform == "linux" or sys.platform == "linux2"
+            use_thread = use_thread if use_thread is not None else is_linux
+            if use_thread:
+                try:
+                    torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
+                except RuntimeError:
+                    pass
+                num_cpus = multiprocessing.cpu_count()
+                num_threads = int(num_cpus / 2)  # can use more or less CPUs
+                ExecutorManager.executor = multiprocessing.Pool()
+
+        return ExecutorManager.executor
 
 
 class Agent:
     """Abstract base class for an AI agent that plays a trick taking game."""
 
-    def __init__(self, game: TrickTakingGame, player_number: int, use_thread: bool = None):
+    def __init__(self, game: TrickTakingGame, player_number: int, executor: bool = None):
         self._game = game
         self._player = player_number
-        self._use_thread = use_thread
-        self.executor = _get_executor(use_thread)
 
     @abc.abstractmethod
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
@@ -71,4 +76,4 @@ class Learner:
     @abc.abstractmethod
     def __init__(self, use_thread: bool = None):
         self._use_thread = use_thread
-        self.executor = _get_executor(use_thread)
+        self.executor = ExecutorManager.get_executor(use_thread)

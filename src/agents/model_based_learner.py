@@ -172,10 +172,8 @@ class ModelBasedLearner(Learner):
                                               for _ in range(task().num_players)],
                                              {"epsilon": self.epsilon, "verbose": False})
 
-        barb_futures = self.executor.map(specific_game_func, range(self._games_per_epoch),
-                                         chunksize=4)
+        barbs= self.executor.map(specific_game_func, range(self._games_per_epoch))
         # wait for completion
-        barbs = list(barb_futures)
         barbs = list(itertools.chain.from_iterable(barbs))
         return barbs
 
