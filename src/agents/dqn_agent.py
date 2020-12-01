@@ -101,6 +101,7 @@ def calculate_action_observation_size(game):
 class DQNLearner(Learner):
 
     def __init__(self, resume_state=None):
+        super().__init__(use_thread=True)
         self.action_size, self.observation_size = calculate_action_observation_size(TestSimpleHearts)
         """ + len(
             constant_game.cards_per_suit) + constant_game.num_players"""
@@ -133,9 +134,6 @@ class DQNLearner(Learner):
         torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
 
     def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
-        num_cpus = multiprocessing.cpu_count()
-        num_threads = int(num_cpus * 3/4)  # can use more or less CPUs
-        executor = futures.ProcessPoolExecutor(max_workers=num_threads)
         for task in tasks:
             for epoch in range(self.num_epochs):
                 # collect experiences
@@ -144,7 +142,7 @@ class DQNLearner(Learner):
                                                 [{"model": self.model} for _ in
                                                  range(4)], {"epsilon": self.epsilon,
                                                              "verbose": False})
-                barb_futures = executor.map(specific_game_func, range(self.games_per_epoch),
+                barb_futures = self.executor.map(specific_game_func, range(self.games_per_epoch),
                                             chunksize=2)
                 # wait for completion
                 barbs = list(barb_futures)

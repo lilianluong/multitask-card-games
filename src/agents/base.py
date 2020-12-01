@@ -1,18 +1,35 @@
 import abc
+import sys
+from concurrent import futures
 from typing import List, Set, Tuple
 
-from torch import nn
+import torch
+from torch import multiprocessing
 
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
 
 
+def _get_executor(use_thread):
+    is_linux = sys.platform == "linux" or sys.platform == "linux2"
+    use_thread = use_thread if use_thread is not None else is_linux
+    executor = None
+    if use_thread:
+        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
+        num_cpus = multiprocessing.cpu_count()
+        num_threads = int(num_cpus / 2)  # can use more or less CPUs
+        executor = futures.ProcessPoolExecutor(max_workers=num_threads)
+    return executor
+
+
 class Agent:
     """Abstract base class for an AI agent that plays a trick taking game."""
 
-    def __init__(self, game: TrickTakingGame, player_number: int):
+    def __init__(self, game: TrickTakingGame, player_number: int, use_thread: bool = None):
         self._game = game
         self._player = player_number
+        self._use_thread = use_thread
+        self.executor = _get_executor(use_thread)
 
     @abc.abstractmethod
     def observe(self, action: Tuple[int, int], observation: List[int], reward: int):
@@ -52,11 +69,6 @@ class Learner:
     """Abstract base class for an AI that learns to play trick taking games."""
 
     @abc.abstractmethod
-    def train(self, tasks: List[TrickTakingGame.__class__]) -> nn.Module:
-        """
-        Given a list of trick taking game environment classes, train on them.
-
-        :param tasks: List of environment classes, which inherit from TrickTakingGame
-        :return: Trained model
-        """
-        pass
+    def __init__(self, use_thread: bool = None):
+        self._use_thread = use_thread
+        self.executor = _get_executor(use_thread)

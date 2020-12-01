@@ -149,7 +149,7 @@ class MonteCarloAgent(ModelBasedAgent):
             # Expansion
             if len(current) < horizon and current + (0,) not in plays:
                 plays[current + (0,)] = 0
-                selected_action = random.randint(0, num_actions - 1)
+                selected_action = random.randint(0, num_actions - 1) # TODO: only expand legally
                 reward = self.get_transition_reward(current, selected_action, reward_cache, nodes, actions)
                 total_reward = inverse_discount * total_reward + reward
                 current = current + (selected_action,)
@@ -158,7 +158,7 @@ class MonteCarloAgent(ModelBasedAgent):
 
             # Simulation
             while len(current) < horizon:
-                selected_action = random.randint(0, num_actions - 1)
+                selected_action = random.randint(0, num_actions - 1) # TODO: only expand legally
                 reward = self.get_transition_reward(current, selected_action, reward_cache, nodes, actions)
                 total_reward = inverse_discount * total_reward + reward
                 current = current + (selected_action,)

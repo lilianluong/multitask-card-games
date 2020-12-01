@@ -1,7 +1,4 @@
 import itertools
-
-import multiprocessing
-from concurrent import futures
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -14,7 +11,6 @@ from agents.base import Learner
 from agents.model_based_agent import ModelBasedAgent
 from agents.models.model_based_models import RewardModel, TransitionModel
 from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel
-
 from environments.trick_taking_game import TrickTakingGame
 from evaluators import evaluate_random
 from game import Game
@@ -38,12 +34,9 @@ class ModelGameRunner:
 
 
 class ModelBasedLearner(Learner):
-    def __init__(self,
-                 agent: ModelBasedAgent.__class__ = ModelBasedAgent,
-                 multitask: bool = False,
+    def __init__(self, agent: ModelBasedAgent.__class__ = ModelBasedAgent, multitask: bool = False,
                  resume_model: Dict[str, Dict[str, Dict[str, Any]]] = None,
-                 model_names: Dict[str, str] = None,
-                 learner_name: str = "MBL"):
+                 model_names: Dict[str, str] = None, learner_name: str = "MBL"):
         """
         :param agent: either ModelBasedAgent or a subclass to use
         :param multitask: whether to use multitask learning or not
@@ -54,6 +47,7 @@ class ModelBasedLearner(Learner):
         :param model_names: maps task names to names to save model as
         :param learner_name: name of the trial for tensorboard records
         """
+        super().__init__(use_thread=True)  # TODO: Support no threading
         self._agent_type = agent
         self._model_names = model_names
         if multitask:
@@ -90,12 +84,6 @@ class ModelBasedLearner(Learner):
             f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
         self.evaluate_every = 50
 
-        # multithreading
-        torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
-        num_cpus = multiprocessing.cpu_count()
-        num_threads = int(num_cpus / 2)  # can use more or less CPUs
-        self.executor = futures.ProcessPoolExecutor(max_workers=num_threads)
-
     def train(self, tasks: List[TrickTakingGame.__class__]):
         for task in tasks:
             self._setup_single_task(task)
@@ -117,8 +105,9 @@ class ModelBasedLearner(Learner):
             if epoch % self.evaluate_every == 0:
                 winrate, matchrate, avg_score, invalid, scores = evaluate_random(tasks,
                                                                                  self._agent_type,
-                                                                                 [self._transition_model,
-                                                                                  self._reward_model],
+                                                                                 [
+                                                                                     self._transition_model,
+                                                                                     self._reward_model],
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
                 print("Done EVAL")
@@ -191,7 +180,8 @@ class ModelBasedLearner(Learner):
         return barbs
 
     def _train_world_models(self, task: TrickTakingGame.__class__,
-                            experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[np.ndarray, np.ndarray]:
+                            experiences: List[Tuple[List[int], int, int, List[int]]]) -> Tuple[
+        np.ndarray, np.ndarray]:
         """
         Train the transition and reward models on the experiences
         :param task: the class of the game to train models for
