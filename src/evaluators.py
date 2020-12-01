@@ -11,7 +11,7 @@ def evaluate_random(tasks, agent_type, models, num_trials=50, compare_agent=None
     Evaluate an agent against 3 random agents on a list of tasks
     :param tasks: list of task classes to evaluate on
     :param agent_type: class of the agent to evaluate
-    :param models: [transition model, reward model]
+    :param models: dictionary accepted by Game of models for this agent
     :param num_trials: int, number of trial games to run per task
     :param compare_agent: optional other agent to compare agent_type to, default will use a random agent
     :return: (win_rate, avg_score, percent_invalid, scores)
@@ -32,7 +32,7 @@ def evaluate_random(tasks, agent_type, models, num_trials=50, compare_agent=None
                 # Evaluate agent
                 game = Game(task,
                             [agent_type] + [RandomAgent] * 3,
-                            [{"transition_model": models[0], "reward_model": models[1]}, {}, {}, {}],
+                            [models, {}, {}, {}],
                             # [{"model": model}, {}, {}, {}],
                             {"epsilon": 0, "verbose": False})
                 score, state = game.run()
@@ -43,7 +43,7 @@ def evaluate_random(tasks, agent_type, models, num_trials=50, compare_agent=None
                 if compare_agent and not isinstance(compare_agent, RandomAgent):
                     game = Game(task,
                                 [compare_agent] + [RandomAgent] * 3,
-                                [{"transition_model": models[0], "reward_model": models[1]}, {}, {}, {}],
+                                [models, {}, {}, {}],
                                 # [{"model": model}, {}, {}, {}],
                                 {"epsilon": 0, "verbose": False})
                 else:

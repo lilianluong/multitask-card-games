@@ -70,7 +70,7 @@ class ModelBasedLearner(Learner):
                 self._reward_model.models[key].load_state_dict(item["state"])
 
         # Hyperparameters
-        self._num_epochs = 500
+        self._num_epochs = 5000
         self._games_per_epoch = 20
         self._batch_size = 112
 

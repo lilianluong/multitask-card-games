@@ -43,6 +43,7 @@ class TrickTakingGame:
         self._state = None
         self._index_card_map = None
         self._num_cards = sum(self.cards_per_suit)
+        self._index_card_map = self._compute_index_card_map()
 
     def reset(self, state: List[int] = None, assert_size: bool = True) -> Tuple[List[int], ...]:
         """
@@ -74,10 +75,7 @@ class TrickTakingGame:
             assert len(
                 self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
                                                                        "wrong size"
-        self._index_card_map = self._compute_index_card_map()
         return self._get_observations()
-
-
 
     def step(self, action: Tuple[int, int]) -> Tuple[
         Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
