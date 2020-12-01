@@ -3,6 +3,7 @@ from typing import List
 import torch
 from torch import nn
 
+from agents.belief_agent import BeliefBasedAgent
 from environments.trick_taking_game import TrickTakingGame
 from util import polynomial_transform
 
@@ -13,7 +14,7 @@ class MultitaskTransitionModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> b'
     """
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = True):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = False):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone
@@ -45,7 +46,7 @@ class MultitaskTransitionModel(nn.Module):
         """
         num_actions = task_instance.num_cards
         num_players = task_instance.num_players
-        belief_size = 4 * num_actions + num_players + len(task_instance.cards_per_suit)
+        belief_size = BeliefBasedAgent(task_instance, 0).get_belief_size()
         d = belief_size + num_actions
         self._input_size = d * (d + 1) if self._polynomial else d
         self._belief_size = belief_size
@@ -78,9 +79,7 @@ class MultitaskTransitionModel(nn.Module):
         assert not self._parameters_returned, "Optimizer has already been initialized, this model would not train"
         game_instance = task()
         if self._input_size:
-            assert (4 * game_instance.num_cards +
-                    game_instance.num_players +
-                    len(game_instance.cards_per_suit)) == self._belief_size
+            assert BeliefBasedAgent(game_instance, 0).get_belief_size() == self._belief_size
             assert game_instance.num_players == self._num_players
         else:
             self.setup(game_instance)
@@ -123,7 +122,7 @@ class MultitaskRewardModel(nn.Module):
     Multilayered perceptron to approximate T: (b, a) -> r
     """
 
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = True):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = False):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone
@@ -153,7 +152,7 @@ class MultitaskRewardModel(nn.Module):
         :return: None
         """
         num_actions = task_instance.num_cards
-        belief_size = 4 * num_actions + task_instance.num_players + len(task_instance.cards_per_suit)
+        belief_size = BeliefBasedAgent(task_instance, 0).get_belief_size()
         d = belief_size + num_actions
         self._input_size = d * (d + 1) if self._polynomial else d
         self._belief_size = belief_size
@@ -185,9 +184,7 @@ class MultitaskRewardModel(nn.Module):
         assert not self._parameters_returned, "Optimizer has already been initialized, this model would not train"
         game_instance = task()
         if self._input_size:
-            assert (4 * game_instance.num_cards +
-                    game_instance.num_players +
-                    len(game_instance.cards_per_suit)) == self._belief_size
+            assert BeliefBasedAgent(game_instance, 0).get_belief_size() == self._belief_size
         else:
             self.setup(game_instance)
         layers = []
