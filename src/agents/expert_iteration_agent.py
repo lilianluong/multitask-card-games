@@ -33,7 +33,7 @@ def mcts(executor, num_workers, belief, game, transition_model, reward_model, ta
     """
     mcts_helper = _MCTSRunner(game, transition_model, reward_model, task_name, timeout, horizon,
                               inverse_discount)
-    thread_results = executor.map(mcts_helper, [belief] * num_workers)
+    thread_results = executor.map(mcts_helper, [belief.detach()] * num_workers)
     # thread_results = [mcts_helper(belief) for _ in range(num_workers)]
     thread_scores, thread_plays = list(map(list, zip(*thread_results)))
     # combine scores lists

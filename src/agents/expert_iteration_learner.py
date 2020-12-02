@@ -1,4 +1,5 @@
 import itertools
+import multiprocessing
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
@@ -275,7 +276,7 @@ class ExpertIterationLearner(Learner):
             for _ in range(horizon):
                 action_values = self._apprentice_model.forward(belief.detach(), task.name)
                 predicted.append(action_values)
-                expert_actions.append(mcts(torch.multiprocessing.Pool(2), 2, belief, game_instance,
+                expert_actions.append(mcts(self.executor, self.num_threads, belief, game_instance,
                                       self._transition_model, self._reward_model, task.name, timeout=0.1))
                 action = torch.zeros((1, game_instance.num_cards)).float().to(device)
                 action[0, torch.argmax(action_values)] = 1
