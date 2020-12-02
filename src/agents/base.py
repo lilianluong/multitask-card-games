@@ -1,13 +1,13 @@
 import abc
 import multiprocessing
 import sys
-from concurrent import futures
 from typing import List, Set, Tuple
 
 import torch
 
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
+
 
 class ExecutorManager:
     executor = None
@@ -19,11 +19,10 @@ class ExecutorManager:
             is_linux = sys.platform == "linux" or sys.platform == "linux2"
             use_thread = use_thread if use_thread is not None else is_linux
             if use_thread:
-
                 torch.multiprocessing.set_start_method('spawn')  # allow CUDA in multiprocessing
 
                 num_cpus = multiprocessing.cpu_count()
-                ExecutorManager.num_threads = int(num_cpus / 2)  # can use more or less CPUs
+                ExecutorManager.num_threads = int(num_cpus * 2 / 3)  # can use more or less CPUs
                 ExecutorManager.executor = multiprocessing.Pool(ExecutorManager.num_threads)
 
         return ExecutorManager.num_threads, ExecutorManager.executor

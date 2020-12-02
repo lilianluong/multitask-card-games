@@ -77,7 +77,7 @@ class ExpertIterationLearner(Learner):
                 self._apprentice_model.models[key].load_state_dict(item["state"])
 
         # Hyperparameters
-        self._num_epochs = 500
+        self._num_epochs = 2000
         self._games_per_epoch = 20
         self._batch_size = 112
 
@@ -277,7 +277,7 @@ class ExpertIterationLearner(Learner):
                 action_values = self._apprentice_model.forward(belief.detach(), task.name)
                 predicted.append(action_values)
                 expert_actions.append(mcts(self.executor, self.num_threads, belief, game_instance,
-                                      self._transition_model, self._reward_model, task.name, timeout=0.1))
+                                      self._transition_model, self._reward_model, task.name, timeout=0.25))
                 action = torch.zeros((1, game_instance.num_cards)).float().to(device)
                 action[0, torch.argmax(action_values)] = 1
                 belief_action = torch.cat([belief.detach(), action], dim=1)
