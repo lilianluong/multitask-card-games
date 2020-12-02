@@ -1,15 +1,15 @@
 import math
 import random
 import time
-from collections import deque, defaultdict, Counter
+from collections import defaultdict, Counter
 from typing import Tuple, List, Union
 
 import numpy as np
 import torch
 
 from agents.belief_agent import BeliefBasedAgent
-from agents.models.model_based_models import RewardModel, TransitionModel, ApprenticeModel
-from agents.models.multitask_models import MultitaskRewardModel, MultitaskTransitionModel, MultitaskApprenticeModel
+from agents.models.model_based_models import ApprenticeModel
+from agents.models.multitask_models import MultitaskApprenticeModel
 from environments.trick_taking_game import TrickTakingGame
 from util import Card
 
@@ -47,10 +47,23 @@ def mcts(executor, num_workers, belief, game, transition_model, reward_model, ta
         plays_counter.update(d)
     plays = dict(plays_counter)
     # compute best move
-    list_actions = list(range(game.num_cards))
-    card_index = max(list_actions,
-                     key=lambda a: scores[(a,)] / plays[(a,)] if plays[(a,)] else -float('inf'))
+    card_index = _get_final_action(belief, game, scores, plays)
     return card_index
+
+
+def _get_final_action(belief, game, scores, plays):
+    action_list = range(game.num_cards - 1)
+    valid_actions = [action for action in action_list if
+                     game.valid_play_from_belief(belief, action)]
+    action_values = {}
+    for a in (valid_actions if len(valid_actions) else action_list):
+        if (a,) in plays and (a,) in scores and plays[(a,)]:
+            action_values[a] = scores[(a,)] / plays[(a,)]
+        else:
+            action_values[a] = -float('inf')
+
+    # get key associated with biggest val
+    return max(action_values, key=action_values.get)
 
 
 class _MCTSRunner:
@@ -116,15 +129,28 @@ class _MCTSRunner:
             current = tuple()
             plays[current] += 1
             total_reward = 0
+            first_selection = True
 
             # Selection
             while len(current) < horizon and current + (0,) in plays:
                 action_values = [_MCTSRunner.ucb(scores[current + (a,)],
-                                                     plays[current + (a,)],
-                                                     plays[current],
-                                                     lowest_score)
+                                                 plays[current + (a,)],
+                                                 plays[current],
+                                                 lowest_score)
                                  for a in list_actions]
-                selected_action = max(list_actions, key=lambda a: action_values[a])
+
+                # on first selection, only choose from valid moves
+                if first_selection:
+                    first_selection = False
+                    valid_list = [action for action in range(num_actions - 1) if
+                                  self._game.valid_play_from_belief(belief, action)]
+                    if len(valid_list) > 0:
+                        selected_action = max(valid_list, key=lambda a: action_values[a])
+                    else:
+                        selected_action = max(list_actions, key=lambda a: action_values[a])
+                else:
+                    selected_action = max(list_actions, key=lambda a: action_values[a])
+
                 reward = self.get_transition_reward(current, selected_action, reward_cache, nodes,
                                                     actions)
                 total_reward = inverse_discount * total_reward + reward
@@ -134,7 +160,7 @@ class _MCTSRunner:
             # Expansion
             if len(current) < horizon and current + (0,) not in plays:
                 plays[current + (0,)] = 0
-                selected_action = random.randint(0, num_actions - 1)  # TODO: only expand legally
+                selected_action = random.randint(0, num_actions - 1)
                 reward = self.get_transition_reward(current, selected_action, reward_cache, nodes,
                                                     actions)
                 total_reward = inverse_discount * total_reward + reward
@@ -144,7 +170,7 @@ class _MCTSRunner:
 
             # Simulation
             while len(current) < horizon:
-                selected_action = random.randint(0, num_actions - 1)  # TODO: only expand legally
+                selected_action = random.randint(0, num_actions - 1)
                 reward = self.get_transition_reward(current, selected_action, reward_cache, nodes,
                                                     actions)
                 total_reward = inverse_discount * total_reward + reward
@@ -178,6 +204,7 @@ class ExpertIterationAgent(BeliefBasedAgent):
             # valid_cards = self._get_hand(self._current_observation, valid_only=True)
             # return random.sample(valid_cards, 1)[0]
 
-        action_values = self._apprentice_model.forward(torch.FloatTensor([self._belief]).to(device), self._task_name)
+        action_values = self._apprentice_model.forward(torch.FloatTensor([self._belief]).to(device),
+                                                       self._task_name)
         best_action = torch.argmax(action_values).item()
         return self._game.index_to_card(best_action)
