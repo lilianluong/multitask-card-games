@@ -14,7 +14,7 @@ class MultitaskTransitionModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> b'
     """
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = False):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone
@@ -24,7 +24,7 @@ class MultitaskTransitionModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [300, 200, 150]
+            layer_sizes = [400, 250, 150]
             # layer_sizes = [1200, 600, 220]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
@@ -122,7 +122,7 @@ class MultitaskRewardModel(nn.Module):
     Multilayered perceptron to approximate T: (b, a) -> r
     """
 
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = False):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 2, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone
@@ -132,7 +132,7 @@ class MultitaskRewardModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [80, 40, 20]
+            layer_sizes = [100, 50, 20]
             # layer_sizes = [200, 40]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
@@ -223,7 +223,7 @@ class MultitaskApprenticeModel(nn.Module):
     Multilayered perceptron to approximate PI: b -> a according to the expert MCTS policy
     """
 
-    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 1, polynomial: bool = False):
+    def __init__(self, layer_sizes: List[int] = None, shared_layers: int = 1, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param shared_layers: number of layers to maintain as a shared backbone

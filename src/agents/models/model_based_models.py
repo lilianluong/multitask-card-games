@@ -14,7 +14,7 @@ class TransitionModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> b'
     """
-    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = False):
+    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param polynomial: whether or not to use the polynomial basis
@@ -23,7 +23,7 @@ class TransitionModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [300, 200, 150]
+            layer_sizes = [400, 250, 150]
             # layer_sizes = [1200, 600, 220]
         self._layer_sizes = layer_sizes
 
@@ -109,7 +109,7 @@ class RewardModel(nn.Module):
     """
     Multilayered perceptron to approximate T: (b, a) -> r
     """
-    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = False):
+    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param polynomial: whether or not to use the polynomial basis
@@ -117,7 +117,7 @@ class RewardModel(nn.Module):
         super().__init__()
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [60, 20]
+            layer_sizes = [80, 30]
             # layer_sizes = [200, 40]
         self._layer_sizes = layer_sizes
 
@@ -196,7 +196,7 @@ class ApprenticeModel(nn.Module):
     """
     Multilayered perceptron to output an action for a given state, imitating an expert MCTS policy
     """
-    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = False):
+    def __init__(self, layer_sizes: List[int] = None, polynomial: bool = True):
         """
         :param layer_sizes: sizes of the hidden layers in the network (there will be len(layer_sizes) + 1 Linear layers)
         :param polynomial: whether or not to use the polynomial basis
@@ -204,7 +204,7 @@ class ApprenticeModel(nn.Module):
         super().__init__()
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [100, 50]
+            layer_sizes = [140, 80, 50]
         self._layer_sizes = layer_sizes
 
         self._polynomial = polynomial
