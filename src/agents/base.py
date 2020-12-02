@@ -1,7 +1,11 @@
 import abc
 import multiprocessing
 import sys
+
 from concurrent import futures
+
+from pathlib import Path
+
 from typing import List, Set, Tuple
 
 import torch
@@ -77,3 +81,4 @@ class Learner:
     def __init__(self, use_thread: bool = None):
         self._use_thread = use_thread
         self.num_threads, self.executor = ExecutorManager.get_executor(use_thread)
+        Path("models").mkdir(parents=True, exist_ok=True)
