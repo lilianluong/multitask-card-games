@@ -24,8 +24,8 @@ class MultitaskTransitionModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [400, 250, 150]
-            # layer_sizes = [1200, 600, 220]
+            # layer_sizes = [400, 250, 150]
+            layer_sizes = [1200, 600, 220]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
         assert 0 < shared_layers <= len(self._layer_sizes)
@@ -132,8 +132,8 @@ class MultitaskRewardModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [100, 50, 20]
-            # layer_sizes = [200, 40]
+            # layer_sizes = [100, 50, 20]
+            layer_sizes = [200, 40]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
         assert 0 < shared_layers <= len(self._layer_sizes)
@@ -233,7 +233,8 @@ class MultitaskApprenticeModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [140, 80, 50]
+            # layer_sizes = [140, 80, 50]
+            layer_sizes = [600, 300, 110]
         self._layer_sizes = layer_sizes
         self._num_shared_layers = shared_layers
         assert 0 < shared_layers <= len(self._layer_sizes)

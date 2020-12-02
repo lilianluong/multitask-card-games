@@ -23,8 +23,8 @@ class TransitionModel(nn.Module):
 
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [400, 250, 150]
-            # layer_sizes = [1200, 600, 220]
+            # layer_sizes = [400, 250, 150]
+            layer_sizes = [1200, 600, 220]
         self._layer_sizes = layer_sizes
 
         self._polynomial = polynomial
@@ -117,8 +117,8 @@ class RewardModel(nn.Module):
         super().__init__()
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [80, 30]
-            # layer_sizes = [200, 40]
+            # layer_sizes = [80, 30]
+            layer_sizes = [200, 40]
         self._layer_sizes = layer_sizes
 
         self._polynomial = polynomial
@@ -204,7 +204,8 @@ class ApprenticeModel(nn.Module):
         super().__init__()
         if layer_sizes is None:
             # Default layer sizes
-            layer_sizes = [140, 80, 50]
+            # layer_sizes = [140, 80, 50]
+            layer_sizes = [600, 300, 110]
         self._layer_sizes = layer_sizes
 
         self._polynomial = polynomial
