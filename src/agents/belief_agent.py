@@ -145,8 +145,12 @@ class BeliefBasedAgent(Agent):
         # Trump suit
         if observation[-3] != -1:
             belief[4 * num_cards + observation[-3]] = 1
-        # Scores
-        belief.extend(observation[num_cards + num_players: num_cards + 2 * num_players])
+        # # Scores
+        # belief.extend(observation[num_cards + num_players: num_cards + 2 * num_players])
+        # Own score
+        belief.append(observation[num_cards + num_players + self._player])
+        # Other scores
+        belief.extend([observation[num_cards + num_players + i] for i in range(num_players) if i != self._player])
         return belief
 
     def _get_hand(self, observation: List[int], valid_only: bool = False) -> Set[Card]:
