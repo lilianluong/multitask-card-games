@@ -33,7 +33,10 @@ def mcts(executor, num_workers, belief, game, transition_model, reward_model, ta
     """
     mcts_helper = _MCTSRunner(game, transition_model, reward_model, task_name, timeout, horizon,
                               inverse_discount)
+    start_time = time.time()
     thread_results = executor.map(mcts_helper, [belief.detach()] * num_workers)
+    elapsed = time.time()-start_time
+    print(f"Elapsed time: {elapsed}")
     # thread_results = [mcts_helper(belief) for _ in range(num_workers)]
     thread_scores, thread_plays = list(map(list, zip(*thread_results)))
     # combine scores lists
@@ -48,6 +51,7 @@ def mcts(executor, num_workers, belief, game, transition_model, reward_model, ta
     plays = dict(plays_counter)
     # compute best move
     card_index = _get_final_action(belief, game, scores, plays)
+    print(f"Total plays: {sum(plays.values())}")
     return card_index
 
 
