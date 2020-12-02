@@ -13,17 +13,6 @@ from environments.hattrick import HatTrick
 from environments.basic_trick import BasicTrick
 from evaluators import evaluate_random
 
-
-MODEL_PARAMS = {
-    "Trick Taking Game": [104, 24, 4],
-    "Test Simple Hearts": [104, 24, 4],
-    "Simple Hearts": [136, 32, 4], 
-    "Test TwentyFive": [136, 32, 4],
-    "Test HatTrick": [136, 32, 4], 
-    "Test Basic Trick": [136, 32, 4]
-}
-
-
 def train(tasks, load_model_names, save_model_names, multitask, learner_name):
     # Set up learner
     if load_model_names:
@@ -37,7 +26,7 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
             resume["apprentice"][task.name] = {"state": apprentice_state, "task": task}
     else:
         resume = None
-    learner = ExpertIterationLearner(agent=ExpertIterationAgent, model_names=save_model_names,
+    learner = ModelBasedLearner(agent=ModelBasedAgent, model_names=save_model_names,
                                      resume_model=resume, multitask=multitask,
                                      learner_name=learner_name)
 
@@ -53,13 +42,15 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
 
 if __name__ == "__main__":
     for i in range(5):
-        train([TestSimpleHearts, TrickTakingGame],
+        # train([TestSimpleHearts, TrickTakingGame, BasicTrick, TwentyFive],
+        #       None,
+        #       {"Test Simple Hearts": f"multitask_tsh_{i}", "Trick Taking Game": f"multitask_ttg_{i}",
+        #        "Basic Trick": f"multitask_basic_{i}", "Twenty-Five": f"multitask_25_{i}"},
+        #       multitask=True,
+        #       learner_name=f"new-multitask-{i}")
+        train([TestSimpleHearts, TrickTakingGame, BasicTrick, TwentyFive],
               None,
-              {"Test Simple Hearts": f"multitask_tsh_{i}", "Trick Taking Game": f"multitask_ttg_{i}"},
-              multitask=True,
-              learner_name=f"exit-{i}")
-        train([TestSimpleHearts, TrickTakingGame],
-              None,
-              {"Test Simple Hearts": f"singletask_tsh_{i}", "Trick Taking Game": f"singletask_ttg_{i}"},
+              {"Test Simple Hearts": f"singletask_tsh_{i}", "Trick Taking Game": f"singletask_ttg_{i}",
+               "Basic Trick": f"singletask_basic_{i}", "Twenty-Five": f"singletask_25_{i}"},
               multitask=False,
-              learner_name=f"exit-{i}")
+              learner_name=f"new-singletask-{i}")

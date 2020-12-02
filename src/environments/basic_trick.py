@@ -2,7 +2,7 @@ import random
 from typing import Dict, List, Tuple, Union
 
 from environments.trick_taking_game import TrickTakingGame
-from util import Card, Suit
+from util import Card, Suit, OutOfTurnException
 
 
 class BasicTrick(TrickTakingGame):
@@ -43,10 +43,7 @@ class BasicTrick(TrickTakingGame):
 		invalid_plays = {}
 		if not self.is_valid_play(player, card_index):
 			valid_cards = [i for i in range(num_cards) if self.is_valid_play(player, i)]
-			if self._state[card_index] == player:
-				rewards[player] -= 10
-			else:
-				rewards[player] -= 100	# Huge penalty for picking an invalid card!
+			rewards[player] -= 50	# Huge penalty for picking an invalid card!
 			card_index = random.choice(valid_cards)  # Choose random valid move to play
 			invalid_plays[player] = "invalid"
 		else:
@@ -143,4 +140,4 @@ class BasicTrick(TrickTakingGame):
 
 	@property
 	def cards_per_suit(self) -> Tuple[int, ...]:
-		return 8, 8, 8, 8
+		return 6, 6, 6, 6

@@ -29,8 +29,8 @@ class TwentyFive(TrickTakingGame):
     name = 'Twenty-Five'
 
     # TODO: randomize trump suit at beginning of each game
-    def _get_trump_suit(self) -> Suit:
-        return Suit.SPADES
+    def _get_trump_suit(self) -> int:
+        return 3
 
     def _deal(self) -> List[int]:
         '''
@@ -111,4 +111,4 @@ class TwentyFive(TrickTakingGame):
 
     @property
     def cards_per_suit(self) -> Tuple[int, ...]:
-        return 8, 8, 8, 8
+        return 6, 6, 6, 6

@@ -75,8 +75,8 @@ class ModelBasedLearner(Learner):
         self._batch_size = 112
 
         self.epsilon = 1.0  # exploration rate, percent time to be epsilon greedy
-        self.epsilon_min = 0.1  # min exploration
-        self.epsilon_decay = 0.999  # to decrease exploration rate over time
+        self.epsilon_min = 0.2  # min exploration
+        self.epsilon_decay = 0.9995  # to decrease exploration rate over time
 
         self._reward_lr = 1e-4
         self._transition_lr = 1e-4
@@ -106,9 +106,8 @@ class ModelBasedLearner(Learner):
             if epoch % self.evaluate_every == 0:
                 winrate, matchrate, avg_score, invalid, scores = evaluate_random(tasks,
                                                                                  self._agent_type,
-                                                                                 [
-                                                                                     self._transition_model,
-                                                                                     self._reward_model],
+                                                                                 {"transition_model": self._transition_model,
+                                                                                  "reward_model": self._reward_model},
                                                                                  num_trials=50,
                                                                                  compare_agent=None)  # MonteCarloAgent)
                 print("Done EVAL")
