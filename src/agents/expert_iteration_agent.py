@@ -20,7 +20,7 @@ action_tensor_cache = {}
 
 def mcts(executor, num_workers, belief, game, transition_model, reward_model, task_name,
          timeout: float = 0.5,
-         horizon: int = 4,
+         horizon: int = 3,
          inverse_discount=1.2) -> int:
     """
     Given models and state, outputs action
