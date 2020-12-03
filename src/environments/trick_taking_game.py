@@ -1,6 +1,8 @@
 import random
 from typing import Dict, List, Tuple, Union
 
+import torch
+
 from util import Card, OutOfTurnException, Suit
 
 
@@ -43,6 +45,7 @@ class TrickTakingGame:
         self._state = None
         self._index_card_map = None
         self._num_cards = sum(self.cards_per_suit)
+        self._index_card_map = self._compute_index_card_map()
 
     def reset(self, state: List[int] = None, assert_size: bool = True) -> Tuple[List[int], ...]:
         """
@@ -72,12 +75,10 @@ class TrickTakingGame:
 
         if assert_size:
             assert len(
-                self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to the " \
-                                                                       "wrong size"
-        self._index_card_map = self._compute_index_card_map()
+                self._state) == self.num_cards + 2 * self.num_players + 3, "state was reset to " \
+                                                                           "the " \
+                                                                           "wrong size"
         return self._get_observations()
-
-
 
     def step(self, action: Tuple[int, int]) -> Tuple[
         Tuple[List[int], ...], Tuple[int, ...], bool, Dict]:
@@ -130,7 +131,8 @@ class TrickTakingGame:
             # Handle rewards
             trick_rewards, next_leader = self._end_trick()
             total_rewards = sum(trick_rewards)
-            rewards = [rewards[i] + 1.3 * trick_rewards[i] - 0.3 * total_rewards for i in range(num_players)]
+            rewards = [rewards[i] + 1.3 * trick_rewards[i] - 0.3 * total_rewards for i in
+                       range(num_players)]
             for i in range(num_players):
                 offset = num_cards + num_players  # index into state correctly
                 self._state[offset + i] += trick_rewards[i]  # update current scores
@@ -178,7 +180,7 @@ class TrickTakingGame:
                 suit += 1
             num = card_index - total
             assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
-            index_map[card_index]=Card(suit=Suit(suit), value=num)
+            index_map[card_index] = Card(suit=Suit(suit), value=num)
         return index_map
 
     def _deal(self) -> List[int]:
@@ -322,6 +324,29 @@ class TrickTakingGame:
 
         return True
 
+    def valid_play_from_belief(self, belief, card_index):
+        belief_col = torch.squeeze(belief)
+        if belief_col[card_index] <= 0.5:
+            return False
+        # Check if player is empty of the starting suit if different suit was played
+        # see if agent thinks no starting card
+        starting_card_section = belief_col[3 * self.num_cards:3 * self.num_cards + self.num_cards]
+        # no starting card
+        if torch.all(starting_card_section < 0.5):
+            return True
+        # is starting card
+        starting_card = self.index_to_card((torch.argmax(
+            starting_card_section)).item())
+        played_card = self.index_to_card(card_index)
+        if played_card.suit != starting_card.suit:
+            for i in range(self.num_cards):
+                if belief_col[i] >= 0.5 and self.index_to_card(
+                        i).suit == starting_card.suit:
+                    return False
+
+        return True
+
+
     @property
     def cards_per_suit(self) -> Tuple[int, ...]:
         """
@@ -401,7 +426,6 @@ class TrickTakingGame:
         num = card_index - total
         assert 0 <= num < self.cards_per_suit[suit], "card value is invalid"
         return Card(suit=Suit(suit), value=num)
-
 
     def card_to_index(self, card: Card) -> int:
         """
