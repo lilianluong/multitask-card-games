@@ -29,9 +29,9 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
     if load_model_names:
         resume = {"transition": {}, "reward": {}, "apprentice": {}}
         for task in tasks:
-            transition_state = torch.load("models/transition_model_temp_{}.pt".format(load_model_names[task.name]))
-            reward_state = torch.load("models/reward_model_temp_{}.pt".format(load_model_names[task.name]))
-            apprentice_state = torch.load("models/apprentice_model_temp_{}.pt".format(load_model_names[task.name]))
+            transition_state = torch.load("models/transition_model_{}.pt".format(load_model_names[task.name]))
+            reward_state = torch.load("models/reward_model_{}.pt".format(load_model_names[task.name]))
+            apprentice_state = torch.load("models/apprentice_model_{}.pt".format(load_model_names[task.name]))
             resume["transition"][task.name] = {"state": transition_state, "task": task}
             resume["reward"][task.name] = {"state": reward_state, "task": task}
             resume["apprentice"][task.name] = {"state": apprentice_state, "task": task}
@@ -54,10 +54,12 @@ def train(tasks, load_model_names, save_model_names, multitask, learner_name):
 if __name__ == "__main__":
     for i in range(5):
         train([TestSimpleHearts, TrickTakingGame],
-              None,
-              {"Test Simple Hearts": f"multitask_tsh_{i}", "Trick Taking Game": f"multitask_ttg_{i}"},
+              {"Test Simple Hearts": f"multitask_tsh_{i}",
+               "Trick Taking Game": f"multitask_ttg_{i}"},
+              {"Test Simple Hearts": f"multitask_cont_tsh_{i}",
+               "Trick Taking Game": f"multitask_cont_ttg_{i}"},
               multitask=True,
-              learner_name=f"exit-{i}")
+              learner_name=f"exit-cont-{i}")
         train([TestSimpleHearts, TrickTakingGame],
               None,
               {"Test Simple Hearts": f"singletask_tsh_{i}", "Trick Taking Game": f"singletask_ttg_{i}"},

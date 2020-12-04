@@ -81,7 +81,7 @@ class ExpertIterationLearner(Learner):
         self._games_per_epoch = 20
         self._batch_size = 112
 
-        self._simulations_per_epoch = 2
+        self._simulations_per_epoch = 40
         self._max_simulations = 50
         self._simulations_delta = 0.3
 
@@ -91,7 +91,7 @@ class ExpertIterationLearner(Learner):
 
         self._reward_lr = 1e-4
         self._transition_lr = 1e-4
-        self._apprentice_lr = 1e-4
+        self._apprentice_lr = 5e-5
 
         self.writer = SummaryWriter(
             f"runs/{learner_name}-{datetime.now().strftime('%d-%m-%Y-%H-%M-%S')}")
